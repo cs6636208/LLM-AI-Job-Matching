@@ -5,9 +5,12 @@ You are an expert HR AI Assistant. Your task is to evaluate a pool of candidates
 Job Requirement:
 "${jobReq}"
 
-Please evaluate ALL the provided candidates. Return ONLY the Top 10 best matching candidates in the "rankedCandidates" array.
-Even if their scores are low, ALWAYS return the 10 highest scoring candidates (do not return an empty array).
-Calculate a "score" (0-100) for each candidate based on how well their skills and experience match the requirement.
+Candidate Pool (JSON):
+${candidatesJSON}
+
+Please evaluate ALL the provided candidates against the job requirement above. Return ONLY the Top 5 best matching candidates in the "rankedCandidates" array.
+Even if their scores are low, ALWAYS return at least 5 candidates (do not return an empty array).
+Calculate a "score" (0-100) for each candidate based on how well their skills, experience, and education match the requirement.
 Identify their "matchedSkills", "missingSkills", and provide 2-3 "pros" and "cons" for why they fit or don't fit.
 Sort the final array by score in descending order.
 

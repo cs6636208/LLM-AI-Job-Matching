@@ -13,6 +13,7 @@ const CandidateRanking = ({ results }) => {
   }
 
   const { rankedCandidates } = results;
+  const top5 = rankedCandidates.slice(0, 5);
 
   const getScoreClass = (score) => {
     if (score >= 80) return 'score-high';
@@ -24,11 +25,11 @@ const CandidateRanking = ({ results }) => {
     <div className="animate-fade-in">
       <h2 className="mb-6 flex items-center gap-2">
         <Trophy size={24} className="text-warning" /> 
-        Top Candidates Ranked
+        Top Candidates Ranked (Top 5)
       </h2>
       
       <div className="candidate-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {rankedCandidates.map((candidate, index) => {
+        {top5.map((candidate, index) => {
           const medals = ['🥇', '🥈', '🥉'];
           const medalColors = [
             'linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,215,0,0.05))',
