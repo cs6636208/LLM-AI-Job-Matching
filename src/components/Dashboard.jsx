@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Upload, Users, Search, Zap, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Upload, Users, Search, Zap, CheckCircle, AlertTriangle, ClipboardList } from 'lucide-react';
 import JobRequirementsForm from './JobRequirementsForm';
 import CandidateRanking from './CandidateRanking';
 import ComparativeAnalysis from './ComparativeAnalysis';
+import ShortlistView from './ShortlistView';
 import { analyzeCandidates } from '../services/llmClient';
 
 const Dashboard = ({ candidates, setCandidates }) => {
@@ -10,6 +11,20 @@ const Dashboard = ({ candidates, setCandidates }) => {
   const [jobReq, setJobReq] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
+  const [shortlist, setShortlist] = useState([]);
+
+  const handleShortlist = (candidate) => {
+    setShortlist(prev => {
+      if (prev.find(c => c.id === candidate.id)) {
+        return prev;
+      }
+      return [...prev, candidate];
+    });
+  };
+
+  const handleRemoveFromShortlist = (candidateId) => {
+    setShortlist(prev => prev.filter(c => c.id !== candidateId));
+  };
 
   const handleRunAnalysis = async (autoSelect = false) => {
     if (!jobReq.trim()) {
@@ -63,6 +78,12 @@ const Dashboard = ({ candidates, setCandidates }) => {
           >
             <Zap size={18} /> Direct Comparison
           </button>
+          <button 
+            className={`nav-btn ${activeTab === 'shortlist' ? 'active' : ''}`}
+            onClick={() => setActiveTab('shortlist')}
+          >
+            <ClipboardList size={18} /> Shortlist ({shortlist.length})
+          </button>
         </nav>
         
         <div className="auto-selector-card glass-panel mt-6 border-warning/30" style={{ padding: '1.25rem' }}>
@@ -91,7 +112,11 @@ const Dashboard = ({ candidates, setCandidates }) => {
         )}
 
         {activeTab === 'comparison' && (
-          <ComparativeAnalysis results={analysisResults} />
+          <ComparativeAnalysis results={analysisResults} onShortlist={handleShortlist} shortlist={shortlist} />
+        )}
+
+        {activeTab === 'shortlist' && (
+          <ShortlistView shortlist={shortlist} onRemove={handleRemoveFromShortlist} />
         )}
       </div>
     </div>

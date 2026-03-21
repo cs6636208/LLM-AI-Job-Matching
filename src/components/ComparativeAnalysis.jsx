@@ -1,7 +1,7 @@
 import React from 'react';
 import { Zap, ThumbsUp, ThumbsDown, UserCheck } from 'lucide-react';
 
-const ComparativeAnalysis = ({ results }) => {
+const ComparativeAnalysis = ({ results, onShortlist, shortlist = [] }) => {
   if (!results || !results.rankedCandidates) {
     return (
       <div className="flex-col items-center justify-center text-center h-full animate-fade-in" style={{ padding: '4rem 0' }}>
@@ -49,9 +49,19 @@ const ComparativeAnalysis = ({ results }) => {
               </div>
             </div>
             
-            <button className={`btn mt-6 w-full ${idx === 0 ? 'btn-primary' : 'btn-secondary'}`}>
-              <UserCheck size={16} /> Shortlist
-            </button>
+            {(() => {
+              const isShortlisted = shortlist.find(c => c.id === candidate.id);
+              return (
+                <button 
+                  className={`btn mt-6 w-full ${isShortlisted ? 'btn-secondary' : idx === 0 ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => onShortlist && onShortlist(candidate)}
+                  disabled={!!isShortlisted}
+                  style={isShortlisted ? { opacity: 0.6, cursor: 'default' } : {}}
+                >
+                  <UserCheck size={16} /> {isShortlisted ? '✓ Shortlisted' : 'Shortlist'}
+                </button>
+              );
+            })()}
           </div>
         ))}
       </div>
