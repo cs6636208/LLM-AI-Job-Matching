@@ -94,7 +94,7 @@ Respond STRICTLY with valid JSON in the following format, with no markdown code 
 
       const data = await response.json();
       let textObj = data.choices[0].message.content;
-      
+
       // Extract exactly the JSON object boundaries from the response
       const jsonMatch = textObj.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -113,7 +113,7 @@ Respond STRICTLY with valid JSON in the following format, with no markdown code 
         textObj = textObj.replace(/\}\s*\{/g, '},{');
         // Auto-fix 3: Sanitize unescaped newlines in strings
         textObj = textObj.replace(/\n/g, '\\n');
-        
+
         try {
           return JSON.parse(textObj);
         } catch (fatalErr) {
@@ -159,9 +159,9 @@ Respond STRICTLY with valid JSON in the following format, with no markdown code 
     let allTopCandidates = batchResults.flatMap(r => r.rankedCandidates || []);
     const seenFinalists = new Set();
     allTopCandidates = allTopCandidates.filter(c => {
-       if (seenFinalists.has(c.id)) return false;
-       seenFinalists.add(c.id);
-       return true;
+      if (seenFinalists.has(c.id)) return false;
+      seenFinalists.add(c.id);
+      return true;
     });
 
     console.log(`[ANALYZE] Tournament: collected ${allTopCandidates.length} finalists from ${batches.length} batches. Running final round...`);
@@ -203,13 +203,14 @@ ${text}
 `;
 
     const requestBody = {
-        model: 'typhoon-v2.5-30b-a3b-instruct',
-        messages: [{ role: 'user', content: extractPrompt }],
-        max_tokens: 1500,
-        temperature: 0.1,
+      model: 'typhoon-v2.5-30b-a3b-instruct',
+      messages: [{ role: 'user', content: extractPrompt }],
+      max_tokens: 1500,
+      temperature: 0.1,
     };
 
     console.log('[EXTRACT] Sending to Typhoon API...', { model: requestBody.model, textLength: text.length });
+    console.log(requestBody.messages);
 
     const response = await fetch(API_URL, {
       method: 'POST',
@@ -221,10 +222,10 @@ ${text}
     });
 
     if (!response.ok) {
-        const err = await response.text();
-        console.error('[EXTRACT] Typhoon API Status:', response.status);
-        console.error('[EXTRACT] Typhoon API Response:', err);
-        return res.status(response.status).json({ error: 'Failed to extract resume data via OpenTyphoon AI', details: err });
+      const err = await response.text();
+      console.error('[EXTRACT] Typhoon API Status:', response.status);
+      console.error('[EXTRACT] Typhoon API Response:', err);
+      return res.status(response.status).json({ error: 'Failed to extract resume data via OpenTyphoon AI', details: err });
     }
 
     const data = await response.json();

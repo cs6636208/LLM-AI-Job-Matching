@@ -22,7 +22,7 @@ export const analyzeCandidates = async (jobReq, candidates) => {
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to analyze');
-    
+
     return data;
   } catch (err) {
     console.error('LLM API Error:', err);
@@ -40,7 +40,7 @@ export const extractProfileFromText = async (resumeText) => {
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to extract resume');
-    
+
     return data;
   } catch (err) {
     console.error('Extraction Error:', err);
@@ -57,7 +57,7 @@ export const extractResumeData = async (file) => {
     } else if (file.type === 'application/pdf') {
       const buffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-      
+
       let fullText = '';
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -82,6 +82,6 @@ export const extractResumeData = async (file) => {
 
 // Expose mock for fast local offline testing if needed, though usually not called anymore.
 export const generateMockAnalysis = async (jobReq, candidates) => {
-    // legacy fallback
-    return { rankedCandidates: [] };
+  // legacy fallback
+  return { rankedCandidates: [] };
 };
