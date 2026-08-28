@@ -7,47 +7,281 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  name      String
-  createdAt DateTime @default(now())
-  
-  // Relations
-  candidates Candidate[]
-  shortlists Shortlist[]
+// ── Enums ────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN           // Full access
+  HR_MANAGER      // Manage jobs, candidates, shortlists
+  INTERVIEWER     // View assigned candidates, add notes
+  VIEWER          // Read-only
 }
+
+enum PipelineStage {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum EmailType {
+  SHORTLIST_NOTIFICATION
+  INTERVIEW_INVITATION
+  REJECTION
+  OFFER_LETTER
+  CUSTOM
+}
+
+// ── User & Auth ──────────────────────────────────────────────────
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  password      String
+  name          String
+  role          Role      @default(HR_MANAGER)
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now())
+
+  // Relations
+  jobs              Job[]
+  candidates        Candidate[]
+  shortlists        Shortlist[]
+  activityLogs      ActivityLog[]
+  interviews        Interview[]          @relation("Interviewer")
+  notes             Note[]
+  emailTemplates    EmailTemplate[]
+  refreshTokens     RefreshToken[]
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ── Jobs (Multi-Job Support) ─────────────────────────────────────
+
+model Job {
+  id              Int      @id @default(autoincrement())
+  userId          Int      // Creator/owner
+  title           String
+  description     String?
+  department      String?
+  location        String?
+  employmentType  String?  // Full-time, Part-time, Contract
+  salaryRange     String?
+  status          String   @default("active")  // active, paused, closed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  // Relations
+  user              User              @relation(fields: [userId], references: [id])
+  jobCandidates     JobCandidate[]
+  rubrics           Rubric[]
+  sentEmails        SentEmail[]
+  interviews        Interview[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ── Candidates ───────────────────────────────────────────────────
 
 model Candidate {
   id                String   @id @default(cuid())
-  userId            Int      // Owner of this candidate
   name              String
-  currentRole       String
-  yearsOfExperience Int
-  skills            String   // Stored as JSON string
-  education         String
-  summary           String
+  currentRole       String   @default("Unknown")
+  yearsOfExperience Int      @default(0)
+  skills            String   @default("[]")   // JSON array
+  education         String   @default("")
+  summary           String   @default("")
+  email             String?
+  phone             String?
   isMock            Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  
-  // Relations
+  userId            Int
   user              User     @relation(fields: [userId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now())
+
+  // Relations
+  jobCandidates     JobCandidate[]
   shortlists        Shortlist[]
+  notes             Note[]
+  interviews        Interview[]
+  offers            Offer[]
+
+  @@index([name])
 }
 
+// ── Job ↔ Candidate junction (Multi-Job support) ─────────────────
+
+model JobCandidate {
+  id              Int           @id @default(autoincrement())
+  jobId           Int
+  candidateId     String
+  stage           PipelineStage @default(APPLIED)
+  aiScore         Int?
+  aiAnalysis      String?       // JSON: { matchedSkills, missingSkills, pros, cons }
+  appliedAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now())
+
+  job             Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate       Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, candidateId])
+  @@index([jobId, stage])
+}
+
+// ── Shortlist (legacy compat + extended) ──────────────────────────
+
 model Shortlist {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  candidateId     String
+  jobId           Int?
+  score           Int?
+  matchedSkills   String?  // JSON
+  missingSkills   String?  // JSON
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id])
+  candidate       Candidate @relation(fields: [candidateId], references: [id])
+
+  @@unique([userId, candidateId])
+}
+
+// ── Custom Scoring Rubrics ───────────────────────────────────────
+
+model Rubric {
+  id          Int      @id @default(autoincrement())
+  jobId       Int
+  name        String   // e.g. "Skills Match", "Experience"
+  weight      Int      @default(10)  // percentage (0-100)
+  description String?
+  createdAt   DateTime @default(now())
+
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+// ── Interview Scheduling ─────────────────────────────────────────
+
+model Interview {
+  id            Int             @id @default(autoincrement())
+  jobId         Int
+  candidateId   String
+  interviewerId Int             // User who conducts the interview
+  scheduledAt   DateTime
+  durationMin   Int             @default(60)
+  location      String?         // Physical or virtual link
+  notes         String?
+  status        InterviewStatus @default(SCHEDULED)
+  feedback      String?         // Interview feedback text
+  score         Int?            // Interview score (0-100)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now())
+
+  job           Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate     Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  interviewer   User            @relation("Interviewer", fields: [interviewerId], references: [id])
+
+  @@index([jobId, candidateId])
+  @@index([interviewerId, scheduledAt])
+}
+
+// ── Notes (Collaborative) ────────────────────────────────────────
+
+model Note {
   id          Int      @id @default(autoincrement())
   userId      Int
   candidateId String
-  score       Int?
-  matchedSkills String? // Stored as JSON string
-  missingSkills String? // Stored as JSON string
+  content     String
+  isPrivate   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+// ── Offer Management ─────────────────────────────────────────────
+
+model Offer {
+  id            Int      @id @default(autoincrement())
+  candidateId   String
+  jobId         Int
+  salary        String?
+  position      String?
+  startDate     DateTime?
+  notes         String?
+  status        String   @default("draft")  // draft, sent, accepted, rejected
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  candidate     Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, jobId])
+}
+
+// ── Email Templates & Sent Emails ────────────────────────────────
+
+model EmailTemplate {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  name        String
+  type        EmailType @default(CUSTOM)
+  subject     String
+  body        String    // HTML body
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, type])
+}
+
+model SentEmail {
+  id            Int      @id @default(autoincrement())
+  jobId         Int
+  toEmail       String
+  subject       String
+  body          String
+  templateId    Int?
+  sentAt        DateTime @default(now())
+
+  job           Job?     @relation(fields: [jobId], references: [id])
+}
+
+// ── Activity Log (Audit Trail) ───────────────────────────────────
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  action      String   // e.g. "stage_changed", "shortlisted", "interview_scheduled"
+  entityType  String   // "candidate", "job", "interview", etc.
+  entityId    String   // ID of the affected entity
+  details     String?  // JSON: additional context
   createdAt   DateTime @default(now())
 
-  // Relations
-  user        User      @relation(fields: [userId], references: [id])
-  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 
-  @@unique([userId, candidateId]) // Prevent shortlisting the same candidate twice per user
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
 }

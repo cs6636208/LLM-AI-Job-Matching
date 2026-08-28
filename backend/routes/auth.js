@@ -47,51 +47,10 @@ const setRefreshTokenCookie = (res, token) => {
  *   post:
  *     tags: [Auth]
  *     summary: Register a new user
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name, email, password]
- *             properties:
- *               name:
- *                 type: string
- *                 example: "John Doe"
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "john@example.com"
- *               password:
- *                 type: string
- *                 minLength: 8
- *                 description: "Must contain uppercase, lowercase, and number"
- *                 example: "SecurePass1"
- *     responses:
- *       201:
- *         description: User registered successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 token:
- *                   type: string
- *                 user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: integer
- *                     email:
- *                       type: string
- *                     name:
- *                       type: string
- *       400:
- *         description: Validation error or user already exists
  */
 router.post('/register', validate(registerSchema), async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, role } = req.body;
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
@@ -99,12 +58,12 @@ router.post('/register', validate(registerSchema), async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const user = await prisma.user.create({
-      data: { email, password: hashedPassword, name }
+      data: { email, password: hashedPassword, name, role: role || 'HR_MANAGER' }
     });
     logger.info({ userId: user.id, email }, 'User registered successfully');
-    const { accessToken, refreshToken } = generateTokens({ id: user.id, email: user.email, name: user.name });
+    const { accessToken, refreshToken } = generateTokens({ id: user.id, email: user.email, name: user.name, role: user.role });
     setRefreshTokenCookie(res, refreshToken);
-    res.status(201).json({ token: accessToken, user: { id: user.id, email: user.email, name: user.name } });
+    res.status(201).json({ token: accessToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   } catch (error) {
     logger.error({ err: error }, 'Registration error');
     res.status(500).json({ error: 'Server error during registration' });
@@ -117,24 +76,6 @@ router.post('/register', validate(registerSchema), async (req, res) => {
  *   post:
  *     tags: [Auth]
  *     summary: Login with email and password
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email, password]
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Login successful
- *       400:
- *         description: Invalid credentials
  */
 router.post('/login', validate(loginSchema), async (req, res) => {
   try {
@@ -148,7 +89,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
     logger.info({ userId: user.id, email }, 'User logged in');
-    const payload = { id: user.id, email: user.email, name: user.name };
+    const payload = { id: user.id, email: user.email, name: user.name, role: user.role };
     const { accessToken, refreshToken } = generateTokens(payload);
     setRefreshTokenCookie(res, refreshToken);
     res.json({ token: accessToken, user: payload });
@@ -163,30 +104,18 @@ router.post('/login', validate(loginSchema), async (req, res) => {
  * /api/auth/refresh:
  *   post:
  *     tags: [Auth]
- *     summary: Refresh access token using httpOnly cookie
- *     description: Uses the refreshToken cookie to generate a new access token
- *     responses:
- *       200:
- *         description: New access token issued
- *       401:
- *         description: No refresh token provided
- *       403:
- *         description: Invalid or expired refresh token
+ *     summary: Refresh access token
  */
 router.post('/refresh', (req, res) => {
   const { refreshToken } = req.cookies;
-  if (!refreshToken) {
-    return res.status(401).json({ error: 'No refresh token provided' });
-  }
+  if (!refreshToken) return res.status(401).json({ error: 'No refresh token provided' });
   try {
     const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
     prisma.user.findUnique({ where: { id: decoded.id } })
       .then((user) => {
-        if (!user) {
-          return res.status(401).json({ error: 'User no longer exists' });
-        }
+        if (!user) return res.status(401).json({ error: 'User no longer exists' });
         logger.debug({ userId: user.id }, 'Token refreshed');
-        const payload = { id: user.id, email: user.email, name: user.name };
+        const payload = { id: user.id, email: user.email, name: user.name, role: user.role };
         const { accessToken, refreshToken: newRefreshToken } = generateTokens(payload);
         setRefreshTokenCookie(res, newRefreshToken);
         res.json({ token: accessToken, user: payload });
@@ -196,42 +125,37 @@ router.post('/refresh', (req, res) => {
         res.status(500).json({ error: 'Server error during token refresh' });
       });
   } catch (err) {
-    logger.warn({ err }, 'Invalid refresh token attempt');
     return res.status(403).json({ error: 'Invalid or expired refresh token' });
   }
 });
 
-/**
- * @swagger
- * /api/auth/logout:
- *   post:
- *     tags: [Auth]
- *     summary: Logout and clear refresh token cookie
- *     responses:
- *       200:
- *         description: Logged out successfully
- */
 router.post('/logout', (req, res) => {
   res.clearCookie('refreshToken', { path: '/api/auth' });
   res.json({ message: 'Logged out successfully' });
 });
 
-/**
- * @swagger
- * /api/auth/me:
- *   get:
- *     tags: [Auth]
- *     summary: Get current authenticated user
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Current user info
- *       401:
- *         description: Unauthorized
- */
 router.get('/me', authenticateToken, async (req, res) => {
   res.json({ user: req.user });
+});
+
+/**
+ * @swagger
+ * /api/auth/users:
+ *   get:
+ *     tags: [Auth]
+ *     summary: List all users (for interview assignment)
+ */
+router.get('/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json(users);
+  } catch (err) {
+    logger.error({ err }, 'Get users error');
+    res.status(500).json({ error: 'Error fetching users' });
+  }
 });
 
 export default router;
