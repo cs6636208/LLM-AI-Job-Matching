@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import ErrorBoundary from './components/ErrorBoundary';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Register from './components/Register';
+import { API_URL } from './config.js';
 
-function App() {
+function AppContent() {
   const [candidates, setCandidates] = useState([]);
   const [user, setUser] = useState(null);
   const [showRegister, setShowRegister] = useState(false);
@@ -21,20 +23,19 @@ function App() {
       }
 
       try {
-        const res = await fetch('http://localhost:5000/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          credentials: 'include',
         });
 
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
         } else {
-          // Token invalid or expired — force login
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
       } catch (err) {
-        // Backend unreachable — fallback to stored user for offline use
         console.warn('Backend unreachable, using cached session:', err.message);
         setUser(JSON.parse(storedUser));
       } finally {
@@ -51,7 +52,6 @@ function App() {
     setUser(null);
   };
 
-  // Show nothing while verifying to avoid flash
   if (isVerifying) {
     return (
       <div className="app-root">
@@ -82,6 +82,7 @@ function App() {
             <Register
               onSwitchToLogin={() => setShowRegister(false)}
               onRegisterSuccess={() => setShowRegister(false)}
+              onLogin={(userData) => setUser(userData)}
             />
           ) : (
             <Login
@@ -99,6 +100,14 @@ function App() {
         />
       )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }
 

@@ -1,19 +1,62 @@
 import express from 'express';
 import fetch from 'node-fetch';
 import { requireAuth } from '../middleware/auth.js';
+import { validate, analyzeSchema, judgeSchema, extractSchema } from '../validate.js';
+import logger from '../logger.js';
 
 const router = express.Router();
 
 const API_KEY = process.env.TYPHOON_API_KEY;
 const API_URL = 'https://api.opentyphoon.ai/v1/chat/completions';
 
-router.post('/analyze', requireAuth, async (req, res) => {
+/**
+ * @swagger
+ * /api/analyze:
+ *   post:
+ *     tags: [AI]
+ *     summary: Analyze and rank candidates against job requirements
+ *     description: |
+ *       Uses Typhoon AI to evaluate candidates in batches (tournament style).
+ *       Automatically splits large candidate pools into batches of 50.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [jobReq, candidates]
+ *             properties:
+ *               jobReq:
+ *                 type: string
+ *                 minLength: 10
+ *                 description: "Detailed job requirements in Thai or English"
+ *                 example: "ต้องการ Senior React Developer ประสบการณ์ 5 ปีขึ้นไป รู้ Node.js, Next.js"
+ *               candidates:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/Candidate'
+ *     responses:
+ *       200:
+ *         description: Ranked candidates with scores
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rankedCandidates:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/RankedCandidate'
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: AI analysis error
+ */
+router.post('/analyze', requireAuth, validate(analyzeSchema), async (req, res) => {
   try {
     const { jobReq, candidates } = req.body;
-
-    if (!jobReq || !candidates || candidates.length === 0) {
-      return res.status(400).json({ error: 'Job requirements and candidates are required.' });
-    }
 
     const BATCH_SIZE = 50;
     const promptTemplate = (candidatePool) => `
@@ -65,7 +108,6 @@ Respond STRICTLY with valid JSON in the following format, with no markdown code 
 }
 `;
 
-    // Helper: call Typhoon API for one batch
     const analyzeOneBatch = async (batch, batchNum) => {
       const prompt = promptTemplate(batch);
       const requestBody = {
@@ -75,64 +117,50 @@ Respond STRICTLY with valid JSON in the following format, with no markdown code 
         temperature: 0.3,
       };
 
-      console.log(`[ANALYZE] Batch ${batchNum}: Sending ${batch.length} candidates to Typhoon API...`);
+      logger.info({ batch: batchNum, candidateCount: batch.length }, '[ANALYZE] Sending batch to Typhoon API');
 
       const response = await fetch(API_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${API_KEY}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const err = await response.text();
-        console.error(`[ANALYZE] Batch ${batchNum} failed:`, err);
+        logger.error({ batch: batchNum, status: response.status, error: err }, '[ANALYZE] Batch failed');
         throw new Error(`Batch ${batchNum} failed: ${err}`);
       }
 
       const data = await response.json();
       let textObj = data.choices[0].message.content;
 
-      // Extract exactly the JSON object boundaries from the response
       const jsonMatch = textObj.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        textObj = jsonMatch[0];
-      } else {
-        textObj = textObj.replace(/^```json/gi, '').replace(/^```/g, '').replace(/```$/g, '').trim();
-      }
+      if (jsonMatch) textObj = jsonMatch[0];
+      else textObj = textObj.replace(/^```json/gi, '').replace(/^```/g, '').replace(/```$/g, '').trim();
 
       try {
         return JSON.parse(textObj);
       } catch (parseErr) {
-        console.warn(`[ANALYZE] Batch ${batchNum} JSON parse failed, attempting auto-fix...`);
-        // Auto-fix 1: Remove trailing commas before closing brackets/braces
+        logger.warn({ batch: batchNum }, '[ANALYZE] JSON parse failed, attempting auto-fix');
         textObj = textObj.replace(/,\s*([\]}])/g, '$1');
-        // Auto-fix 2: Add missing commas between objects in an array
         textObj = textObj.replace(/\}\s*\{/g, '},{');
-        // Auto-fix 3: Sanitize unescaped newlines in strings
         textObj = textObj.replace(/\n/g, '\\n');
-
         try {
           return JSON.parse(textObj);
         } catch (fatalErr) {
-          console.error(`[ANALYZE] FATAL: AI returned unparseable JSON in Batch ${batchNum}.\nRaw Output:\n${textObj}`);
-          // Return an empty list if this batch fails completely so the whole tournament doesn't crash
+          logger.error({ batch: batchNum, raw: textObj.slice(0, 500) }, '[ANALYZE] FATAL: unparseable JSON');
           return { rankedCandidates: [] };
         }
       }
     };
 
-    // Split candidates into batches
     const batches = [];
     for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
       batches.push(candidates.slice(i, i + BATCH_SIZE));
     }
 
-    console.log(`[ANALYZE] Total candidates: ${candidates.length}, split into ${batches.length} batch(es) of up to ${BATCH_SIZE}`);
+    logger.info({ total: candidates.length, batchCount: batches.length }, '[ANALYZE] Starting analysis');
 
-    // Helper to remove any duplicate candidates the AI hallucinates
     const deduplicateCandidates = (result) => {
       if (!result || !result.rankedCandidates) return result;
       const seen = new Set();
@@ -145,17 +173,14 @@ Respond STRICTLY with valid JSON in the following format, with no markdown code 
     };
 
     if (batches.length === 1) {
-      // Only 1 batch — direct call, no tournament needed
       const result = await analyzeOneBatch(batches[0], 1);
       return res.json(deduplicateCandidates(result));
     }
 
-    // Tournament mode: run all batches in parallel, collect top 5 from each
     const batchResults = await Promise.all(
       batches.map((batch, idx) => analyzeOneBatch(batch, idx + 1))
     );
 
-    // Collect all top candidates from each batch, and deduplicate them just in case
     let allTopCandidates = batchResults.flatMap(r => r.rankedCandidates || []);
     const seenFinalists = new Set();
     allTopCandidates = allTopCandidates.filter(c => {
@@ -164,24 +189,55 @@ Respond STRICTLY with valid JSON in the following format, with no markdown code 
       return true;
     });
 
-    console.log(`[ANALYZE] Tournament: collected ${allTopCandidates.length} finalists from ${batches.length} batches. Running final round...`);
-
-    // Final round: pick the overall Top 5 from all batch winners
+    logger.info({ finalistCount: allTopCandidates.length, batchCount: batches.length }, '[ANALYZE] Tournament final round');
     const finalResult = await analyzeOneBatch(allTopCandidates, 'FINAL');
     return res.json(deduplicateCandidates(finalResult));
 
   } catch (error) {
-    console.error('AI Analysis Error:', error);
+    logger.error({ err: error }, 'AI Analysis error');
     res.status(500).json({ error: 'Error analyzing candidates via AI' });
   }
 });
 
-router.post('/judge', requireAuth, async (req, res) => {
+/**
+ * @swagger
+ * /api/judge:
+ *   post:
+ *     tags: [AI]
+ *     summary: Side-by-side comparison and declare a winner
+ *     description: Uses Typhoon AI to compare shortlisted candidates and declare one winner
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [jobReq, candidates]
+ *             properties:
+ *               jobReq:
+ *                 type: string
+ *                 description: Job requirements
+ *               candidates:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/Candidate'
+ *     responses:
+ *       200:
+ *         description: Verdict with winner and runner-ups (Thai markdown)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 verdict:
+ *                   type: string
+ *                   description: Thai markdown with winner analysis
+ */
+router.post('/judge', requireAuth, validate(judgeSchema), async (req, res) => {
   try {
     const { jobReq, candidates } = req.body;
-    if (!jobReq || !candidates || candidates.length === 0) {
-      return res.status(400).json({ error: 'Job requirement and candidates are required.' });
-    }
 
     const judgePrompt = `
 You are the Executive HR Director. You have shortlisted a final set of elite candidates for the following job requirement:
@@ -212,19 +268,16 @@ Include these headers:
       temperature: 0.4,
     };
 
-    console.log('[JUDGE] Sending to Typhoon API...');
+    logger.info('[JUDGE] Sending to Typhoon API');
     const response = await fetch(API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${API_KEY}`,
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
       body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const err = await response.text();
-      console.error('[JUDGE] Typhoon API Status:', response.status);
+      logger.error({ status: response.status }, '[JUDGE] Typhoon API failed');
       return res.status(response.status).json({ error: 'Failed to judge via OpenTyphoon AI' });
     }
 
@@ -232,17 +285,45 @@ Include these headers:
     return res.json({ verdict: data.choices[0].message.content });
 
   } catch (error) {
-    console.error('AI Judge Error:', error);
+    logger.error({ err: error }, 'AI Judge error');
     res.status(500).json({ error: 'Error judging candidates' });
   }
 });
 
-router.post('/extract', requireAuth, async (req, res) => {
+/**
+ * @swagger
+ * /api/extract:
+ *   post:
+ *     tags: [AI]
+ *     summary: Extract candidate profile from resume text
+ *     description: Uses Typhoon AI to parse resume text into structured candidate data
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [text]
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 minLength: 20
+ *                 description: Raw resume text extracted from PDF/TXT
+ *     responses:
+ *       200:
+ *         description: Extracted candidate profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Candidate'
+ *       400:
+ *         description: Invalid input
+ */
+router.post('/extract', requireAuth, validate(extractSchema), async (req, res) => {
   try {
     const { text } = req.body;
-    if (!text || text.trim() === '') {
-      return res.status(400).json({ error: 'Resume text is required for extraction' });
-    }
 
     const extractPrompt = `
 You are an expert HR AI Data Extractor. Extract the candidate's profile from the following resume text.
@@ -270,22 +351,17 @@ ${text}
       temperature: 0.1,
     };
 
-    console.log('[EXTRACT] Sending to Typhoon API...', { model: requestBody.model, textLength: text.length });
-    console.log(requestBody.messages);
+    logger.info({ textLength: text.length }, '[EXTRACT] Sending to Typhoon API');
 
     const response = await fetch(API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${API_KEY}`,
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${API_KEY}` },
       body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const err = await response.text();
-      console.error('[EXTRACT] Typhoon API Status:', response.status);
-      console.error('[EXTRACT] Typhoon API Response:', err);
+      logger.error({ status: response.status }, '[EXTRACT] Typhoon API failed');
       return res.status(response.status).json({ error: 'Failed to extract resume data via OpenTyphoon AI', details: err });
     }
 
@@ -293,29 +369,24 @@ ${text}
     let textObj = data.choices[0].message.content;
 
     textObj = textObj.replace(/^```json[\r\n]*/gi, '').replace(/^```[\r\n]*/g, '').replace(/```$/g, '').trim();
-
-    // Extract exactly the JSON object boundaries (robust against AI preamble text)
     const jsonMatch = textObj.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      textObj = jsonMatch[0];
-    }
+    if (jsonMatch) textObj = jsonMatch[0];
 
     try {
       const parsedData = JSON.parse(textObj);
       return res.json(parsedData);
     } catch (parseErr) {
-      // Auto-fix: remove trailing commas before closing brackets/braces
       textObj = textObj.replace(/,\s*([\]}])/g, '$1');
       try {
         const parsedData = JSON.parse(textObj);
         return res.json(parsedData);
       } catch (fatalErr) {
-        console.error('[EXTRACT] FATAL: AI returned unparseable JSON.\nRaw Output:\n', textObj);
+        logger.error({ raw: textObj.slice(0, 500) }, '[EXTRACT] FATAL: unparseable JSON');
         return res.status(500).json({ error: 'AI returned invalid JSON format. Please try again.' });
       }
     }
   } catch (error) {
-    console.error('AI Extraction Error:', error);
+    logger.error({ err: error }, 'AI Extraction error');
     return res.status(500).json({ error: 'Server error extracting resume data' });
   }
 });

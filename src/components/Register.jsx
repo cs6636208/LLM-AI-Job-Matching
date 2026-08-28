@@ -1,32 +1,50 @@
 import React, { useState } from 'react';
-import { User, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { User, Lock, Mail, ShieldCheck, Info } from 'lucide-react';
+import { API_URL } from '../config.js';
 
-const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
+const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [validationErrors, setValidationErrors] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const passwordChecks = [
+    { label: 'อย่างน้อย 8 ตัวอักษร', test: (p) => p.length >= 8 },
+    { label: 'มีตัวพิมพ์ใหญ่ (A-Z)', test: (p) => /[A-Z]/.test(p) },
+    { label: 'มีตัวพิมพ์เล็ก (a-z)', test: (p) => /[a-z]/.test(p) },
+    { label: 'มีตัวเลข (0-9)', test: (p) => /[0-9]/.test(p) },
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setValidationErrors([]);
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/register', {
+      const res = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, email, password }),
+        credentials: 'include',
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'ลงทะเบียนไม่สำเร็จ');
+        if (data.details) {
+          setValidationErrors(data.details);
+        } else {
+          throw new Error(data.error || 'ลงทะเบียนไม่สำเร็จ');
+        }
+        return;
       }
 
-      onRegisterSuccess(email); 
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      onLogin(data.user);
     } catch (err) {
       setError(err.message === 'User already exists' ? 'มีอีเมลนี้ในระบบแล้ว' : err.message);
     } finally {
@@ -45,6 +63,16 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
       </div>
 
       {error && <div className="auth-error">{error}</div>}
+
+      {validationErrors.length > 0 && (
+        <div className="auth-error">
+          <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+            {validationErrors.map((err, i) => (
+              <li key={i}>{err.field}: {err.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="auth-form">
         <div>
@@ -86,11 +114,30 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin }) => {
               required
               className="input-field"
               placeholder="••••••••"
-              minLength={6}
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          {password.length > 0 && (
+            <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              {passwordChecks.map((check, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    fontSize: '0.75rem',
+                    color: check.test(password) ? 'var(--success)' : 'var(--text-muted)',
+                  }}
+                >
+                  <span>{check.test(password) ? '✓' : '○'}</span>
+                  <span>{check.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <button

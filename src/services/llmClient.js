@@ -1,28 +1,93 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import { API_URL } from '../config.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const BACKEND_URL = 'http://localhost:5000/api';
+// ── Token Refresh Logic ──────────────────────────────────────────
+let isRefreshing = false;
+let refreshSubscribers = [];
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  };
+const onTokenRefreshed = (newToken) => {
+  refreshSubscribers.forEach(cb => cb(newToken));
+  refreshSubscribers = [];
 };
+
+const subscribeTokenRefresh = (cb) => {
+  refreshSubscribers.push(cb);
+};
+
+/**
+ * Core fetch wrapper: attaches the current access token, and if the
+ * server responds 403 (expired token), automatically requests a new
+ * one via the httpOnly refresh-token cookie before retrying once.
+ */
+const authFetch = async (url, options = {}) => {
+  const token = localStorage.getItem('token');
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  // First attempt
+  let res = await fetch(url, { ...options, headers, credentials: 'include' });
+
+  // If 403, try to refresh the access token
+  if (res.status === 403) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      try {
+        const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include', // send httpOnly cookie
+        });
+
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          onTokenRefreshed(data.token);
+        } else {
+          // Refresh failed — force logout
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.reload();
+          throw new Error('Session expired. Please log in again.');
+        }
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    // Wait for the ongoing refresh to complete, then retry
+    const newToken = await new Promise((resolve) => {
+      subscribeTokenRefresh(resolve);
+    });
+
+    const retryHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${newToken}`,
+      ...options.headers,
+    };
+
+    res = await fetch(url, { ...options, headers: retryHeaders, credentials: 'include' });
+  }
+
+  return res;
+};
+
+// ── Public API ───────────────────────────────────────────────────
 
 export const judgeCandidates = async (jobReq, candidates) => {
   try {
-    const res = await fetch(`${BACKEND_URL}/judge`, {
+    const res = await authFetch(`${API_URL}/judge`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ jobReq, candidates })
+      body: JSON.stringify({ jobReq, candidates }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to judge');
-
     return data;
   } catch (err) {
     console.error('LLM Judge API Error:', err);
@@ -32,15 +97,13 @@ export const judgeCandidates = async (jobReq, candidates) => {
 
 export const analyzeCandidates = async (jobReq, candidates) => {
   try {
-    const res = await fetch(`${BACKEND_URL}/analyze`, {
+    const res = await authFetch(`${API_URL}/analyze`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ jobReq, candidates })
+      body: JSON.stringify({ jobReq, candidates }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to analyze');
-
     return data;
   } catch (err) {
     console.error('LLM API Error:', err);
@@ -50,15 +113,13 @@ export const analyzeCandidates = async (jobReq, candidates) => {
 
 export const extractProfileFromText = async (resumeText) => {
   try {
-    const res = await fetch(`${BACKEND_URL}/extract`, {
+    const res = await authFetch(`${API_URL}/extract`, {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ text: resumeText })
+      body: JSON.stringify({ text: resumeText }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to extract resume');
-
     return data;
   } catch (err) {
     console.error('Extraction Error:', err);

@@ -5,6 +5,7 @@ import CandidateRanking from './CandidateRanking';
 import ComparativeAnalysis from './ComparativeAnalysis';
 import ShortlistView from './ShortlistView';
 import { analyzeCandidates } from '../services/llmClient';
+import { API_URL } from '../config.js';
 
 const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('requirements');
@@ -18,8 +19,9 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
       try {
         const token = localStorage.getItem('token');
         if (!token) return;
-        const res = await fetch('http://localhost:5000/api/candidates/shortlists', {
-          headers: { 'Authorization': `Bearer ${token}` }
+        const res = await fetch(`${API_URL}/candidates/shortlists`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          credentials: 'include',
         });
         const data = await res.json();
         if (res.ok) setShortlist(data);
@@ -45,10 +47,11 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
     try {
       const token = localStorage.getItem('token');
       if (token) {
-        await fetch(`http://localhost:5000/api/candidates/shortlist/${candidate.id}`, {
+        await fetch(`${API_URL}/candidates/shortlist/${candidate.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ score: candidate.score, matchedSkills: candidate.matchedSkills, missingSkills: candidate.missingSkills })
+          body: JSON.stringify({ score: candidate.score, matchedSkills: candidate.matchedSkills, missingSkills: candidate.missingSkills }),
+          credentials: 'include',
         });
       }
     } catch (err) {
@@ -68,10 +71,11 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
     try {
       const token = localStorage.getItem('token');
       if (token) {
-        await fetch(`http://localhost:5000/api/candidates/shortlist/${candidateId}`, {
+        await fetch(`${API_URL}/candidates/shortlist/${candidateId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({})
+          body: JSON.stringify({}),
+          credentials: 'include',
         });
       }
     } catch (err) {

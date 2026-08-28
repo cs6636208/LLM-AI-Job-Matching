@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Mail, ArrowRight } from 'lucide-react';
+import { API_URL } from '../config.js';
 
 const Login = ({ onLogin, onSwitchToRegister }) => {
   const [email, setEmail] = useState('');
@@ -13,10 +14,11 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        credentials: 'include', // receive httpOnly refresh token cookie
       });
 
       const data = await res.json();

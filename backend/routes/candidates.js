@@ -1,11 +1,30 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth.js';
+import { validate, bulkCandidateSchema } from '../validate.js';
+import logger from '../logger.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Get all candidates for user
+/**
+ * @swagger
+ * /api/candidates:
+ *   get:
+ *     tags: [Candidates]
+ *     summary: Get all candidates for the authenticated user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of candidates
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Candidate'
+ */
 router.get('/', requireAuth, async (req, res) => {
   try {
     const candidates = await prisma.candidate.findMany({
@@ -13,7 +32,6 @@ router.get('/', requireAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
     
-    // Parse skills from JSON string
     const formatted = candidates.map(c => ({
       ...c,
       skills: JSON.parse(c.skills)
@@ -21,18 +39,42 @@ router.get('/', requireAuth, async (req, res) => {
     
     res.json(formatted);
   } catch (err) {
-    console.error('Get candidates error', err);
+    logger.error({ err, userId: req.user?.id }, 'Get candidates error');
     res.status(500).json({ error: 'Error fetching candidates' });
   }
 });
 
-// Create multiple candidates (used for sync or mock load)
-router.post('/bulk', requireAuth, async (req, res) => {
+/**
+ * @swagger
+ * /api/candidates/bulk:
+ *   post:
+ *     tags: [Candidates]
+ *     summary: Create multiple candidates at once
+ *     description: Used for syncing mock data or bulk importing from resume parsing
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [candidates]
+ *             properties:
+ *               candidates:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/Candidate'
+ *     responses:
+ *       200:
+ *         description: Candidates saved successfully
+ *       400:
+ *         description: Validation error
+ */
+router.post('/bulk', requireAuth, validate(bulkCandidateSchema), async (req, res) => {
   try {
-    const { candidates } = req.body; // array of candidate objects
-    if (!Array.isArray(candidates)) return res.status(400).json({ error: 'Expected an array' });
+    const { candidates } = req.body;
 
-    // Map to DB structure
     const dbData = candidates.map(c => ({
       userId: req.user.id,
       name: c.name,
@@ -44,18 +86,53 @@ router.post('/bulk', requireAuth, async (req, res) => {
       isMock: c.id?.includes('RAND') || false
     }));
 
-    await prisma.candidate.createMany({
-      data: dbData
-    });
+    await prisma.candidate.createMany({ data: dbData });
 
+    logger.info({ userId: req.user.id, count: candidates.length }, 'Bulk candidates saved');
     res.json({ message: 'Saved successfully' });
   } catch (err) {
-    console.error('Bulk save error', err);
+    logger.error({ err, userId: req.user?.id }, 'Bulk save error');
     res.status(500).json({ error: 'Error saving candidates' });
   }
 });
 
-// Toggle shortlist candidate
+/**
+ * @swagger
+ * /api/candidates/shortlist/{candidateId}:
+ *   post:
+ *     tags: [Candidates]
+ *     summary: Toggle shortlist status for a candidate
+ *     description: Adds or removes a candidate from the user's shortlist
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: candidateId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               score:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 100
+ *               matchedSkills:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               missingSkills:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Shortlist toggled successfully
+ */
 router.post('/shortlist/:candidateId', requireAuth, async (req, res) => {
   try {
     const { candidateId } = req.params;
@@ -66,11 +143,10 @@ router.post('/shortlist/:candidateId', requireAuth, async (req, res) => {
     });
 
     if (existing) {
-      // Remove it
       await prisma.shortlist.delete({ where: { id: existing.id }});
+      logger.info({ userId: req.user.id, candidateId }, 'Removed from shortlist');
       return res.json({ message: 'Removed from shortlist', isShortlisted: false });
     } else {
-      // Add it
       await prisma.shortlist.create({
         data: {
           userId: req.user.id,
@@ -80,15 +156,27 @@ router.post('/shortlist/:candidateId', requireAuth, async (req, res) => {
           missingSkills: JSON.stringify(missingSkills || [])
         }
       });
+      logger.info({ userId: req.user.id, candidateId }, 'Added to shortlist');
       return res.json({ message: 'Added to shortlist', isShortlisted: true });
     }
   } catch (err) {
-    console.error('Shortlist error', err);
+    logger.error({ err, userId: req.user?.id }, 'Shortlist error');
     res.status(500).json({ error: 'Error toggling shortlist' });
   }
 });
 
-// Get shortlists
+/**
+ * @swagger
+ * /api/candidates/shortlists:
+ *   get:
+ *     tags: [Candidates]
+ *     summary: Get all shortlisted candidates
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of shortlisted candidates with scores
+ */
 router.get('/shortlists', requireAuth, async (req, res) => {
   try {
     const items = await prisma.shortlist.findMany({
@@ -108,7 +196,7 @@ router.get('/shortlists', requireAuth, async (req, res) => {
 
     res.json(formatted);
   } catch (err) {
-    console.error('Get shortlists err', err);
+    logger.error({ err, userId: req.user?.id }, 'Get shortlists error');
     res.status(500).json({ error: 'Error fetching shortlists' });
   }
 });

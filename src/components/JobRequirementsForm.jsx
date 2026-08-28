@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, Briefcase, Code, Zap, Shuffle, FileText, Users, Database } from 'lucide-react';
+import { API_URL } from '../config.js';
 
 const JobRequirementsForm = ({ jobReq, setJobReq, onAnalyze, isAnalyzing, candidatesCount, setCandidates, candidates }) => {
 
@@ -23,13 +24,14 @@ const JobRequirementsForm = ({ jobReq, setJobReq, onAnalyze, isAnalyzing, candid
 
       const token = localStorage.getItem('token');
       if (token) {
-        await fetch('http://localhost:5000/api/candidates/bulk', {
+        await fetch(`${API_URL}/candidates/bulk`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ candidates: [newCandidate] })
+          body: JSON.stringify({ candidates: [newCandidate] }),
+          credentials: 'include',
         });
       }
 
