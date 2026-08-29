@@ -39,6 +39,7 @@ const PipelineBoard = ({ job, user }) => {
   useEffect(() => {
     setLoading(true);
     fetchPipeline();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id]);
 
   const moveCandidate = async (candidateId, fromStage, direction) => {

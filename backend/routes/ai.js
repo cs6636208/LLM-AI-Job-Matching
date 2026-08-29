@@ -113,7 +113,7 @@ Respond STRICTLY with valid JSON in the following format, with no markdown code 
       const requestBody = {
         model: 'typhoon-v2.5-30b-a3b-instruct',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 16384,
+        max_tokens: 8192,
         temperature: 0.3,
       };
 

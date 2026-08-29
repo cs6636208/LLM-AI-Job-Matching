@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { MessageSquare, Lock, Trash2 } from 'lucide-react';
 import { API_URL } from '../config.js';
 
@@ -17,7 +17,20 @@ const NotesPanel = ({ candidateId }) => {
     if (res.ok) setNotes(await res.json());
   };
 
-  useEffect(() => { fetchNotes(); }, [candidateId]);
+  useEffect(() => {
+    let isMounted = true;
+    const loadNotes = async () => {
+      if (!candidateId) return;
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/notes/${candidateId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (res.ok && isMounted) setNotes(await res.json());
+    };
+    loadNotes();
+    return () => { isMounted = false; };
+  }, [candidateId]);
 
   const handleAdd = async (e) => {
     e.preventDefault();

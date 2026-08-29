@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Zap, ClipboardList, LogOut, User, BarChart3, Briefcase, GitBranch, Calendar, Mail, FileText, History, Download } from 'lucide-react';
 import JobRequirementsForm from './JobRequirementsForm';
 import CandidateRanking from './CandidateRanking';
@@ -14,7 +14,7 @@ import ExportPDF from './ExportPDF';
 import { analyzeCandidates } from '../services/llmClient';
 import { API_URL } from '../config.js';
 
-const ROLE_LABELS = { ADMIN: '👑 Admin', HR_MANAGER: '💼 HR Manager', INTERVIEWER: '🗣️ Interviewer', VIEWER: '👁️ Viewer' };
+const ROLE_LABELS = { ADMIN: '๐‘‘ Admin', HR_MANAGER: '๐’ผ HR Manager', INTERVIEWER: '๐—ฃ๏ธ Interviewer', VIEWER: '๐‘๏ธ Viewer' };
 
 const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('requirements');
@@ -23,7 +23,7 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
   const [analysisResults, setAnalysisResults] = useState(null);
   const [shortlist, setShortlist] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [jobRefresh, setJobRefresh] = useState(0);
+  const [jobRefresh, _setJobRefresh] = useState(0);
 
   useEffect(() => {
     const fetchShortlist = async () => {
@@ -89,52 +89,52 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
   };
 
   const handleRunAnalysis = async (autoSelect = false) => {
-    if (!jobReq.trim()) { alert('กรุณากรอกความต้องการของตำแหน่งงาน (Job Requirements) ก่อนครับ'); return; }
-    if (candidates.length === 0) { alert("กรุณาโหลดข้อมูลผู้สมัครก่อนครับ สามารถกดปุ่ม 'โหลดข้อมูลจำลอง' ได้เลย"); return; }
+    if (!jobReq.trim()) { alert('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเธงเธฒเธกเธ•เนเธญเธเธเธฒเธฃเธเธญเธเธ•เธณเนเธซเธเนเธเธเธฒเธ (Job Requirements) เธเนเธญเธเธเธฃเธฑเธ'); return; }
+    if (candidates.length === 0) { alert("เธเธฃเธธเธ“เธฒเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธเธนเนเธชเธกเธฑเธเธฃเธเนเธญเธเธเธฃเธฑเธ เธชเธฒเธกเธฒเธฃเธ–เธเธ”เธเธธเนเธก 'เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธเธณเธฅเธญเธ' เนเธ”เนเน€เธฅเธข"); return; }
     setIsAnalyzing(true);
     try {
       const response = await analyzeCandidates(jobReq, candidates);
       setAnalysisResults(response);
       setActiveTab(autoSelect === true ? 'comparison' : 'ranking');
     } catch (error) {
-      alert('เกิดข้อผิดพลาดในการวิเคราะห์ข้อมูล: ' + error.message);
+      alert('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธงเธดเน€เธเธฃเธฒเธฐเธซเนเธเนเธญเธกเธนเธฅ: ' + error.message);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // ── Tabs ────────────────────────────────────────────────────────
+  // โ”€โ”€ Tabs โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
   const tabs = [
-    { id: 'requirements', label: 'รายละเอียดงาน', Icon: Briefcase, section: 'workspace' },
-    { id: 'pipeline', label: 'Pipeline ผู้สมัคร', Icon: GitBranch, section: 'recruit', disabled: !selectedJob },
-    { id: 'interviews', label: 'นัดสัมภาษณ์', Icon: Calendar, section: 'recruit', disabled: !selectedJob },
-    { id: 'emails', label: 'อีเมล', Icon: Mail, section: 'recruit', disabled: !selectedJob },
-    { id: 'offers', label: 'ข้อเสนองาน', Icon: FileText, section: 'recruit', disabled: !selectedJob },
-    { id: 'ranking', label: 'จัดอันดับผู้สมัคร', Icon: BarChart3, section: 'analysis', disabled: !analysisResults },
-    { id: 'comparison', label: 'เปรียบเทียบ Top 5', Icon: Zap, section: 'analysis', disabled: !analysisResults },
+    { id: 'requirements', label: 'เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธฒเธ', Icon: Briefcase, section: 'workspace' },
+    { id: 'pipeline', label: 'Pipeline เธเธนเนเธชเธกเธฑเธเธฃ', Icon: GitBranch, section: 'recruit', disabled: !selectedJob },
+    { id: 'interviews', label: 'เธเธฑเธ”เธชเธฑเธกเธ เธฒเธฉเธ“เน', Icon: Calendar, section: 'recruit', disabled: !selectedJob },
+    { id: 'emails', label: 'เธญเธตเน€เธกเธฅ', Icon: Mail, section: 'recruit', disabled: !selectedJob },
+    { id: 'offers', label: 'เธเนเธญเน€เธชเธเธญเธเธฒเธ', Icon: FileText, section: 'recruit', disabled: !selectedJob },
+    { id: 'ranking', label: 'เธเธฑเธ”เธญเธฑเธเธ”เธฑเธเธเธนเนเธชเธกเธฑเธเธฃ', Icon: BarChart3, section: 'analysis', disabled: !analysisResults },
+    { id: 'comparison', label: 'เน€เธเธฃเธตเธขเธเน€เธ—เธตเธขเธ Top 5', Icon: Zap, section: 'analysis', disabled: !analysisResults },
     { id: 'shortlist', label: 'Shortlist', Icon: ClipboardList, section: 'results', badge: shortlist.length || 0 },
-    { id: 'activity', label: 'กิจกรรม', Icon: History, section: 'results' },
+    { id: 'activity', label: 'เธเธดเธเธเธฃเธฃเธก', Icon: History, section: 'results' },
   ];
 
   const pageInfo = {
-    requirements: { title: 'ระบบคัดกรองผู้สมัคร', Icon: Briefcase },
-    pipeline: { title: 'Pipeline ผู้สมัคร', Icon: GitBranch },
-    interviews: { title: 'นัดสัมภาษณ์', Icon: Calendar },
-    emails: { title: 'จัดการอีเมล', Icon: Mail },
-    offers: { title: 'ข้อเสนองาน', Icon: FileText },
-    ranking: { title: 'ผลการจัดอันดับผู้สมัคร', Icon: BarChart3 },
-    comparison: { title: 'วิเคราะห์และเปรียบเทียบโดย AI', Icon: Zap },
+    requirements: { title: 'เธฃเธฐเธเธเธเธฑเธ”เธเธฃเธญเธเธเธนเนเธชเธกเธฑเธเธฃ', Icon: Briefcase },
+    pipeline: { title: 'Pipeline เธเธนเนเธชเธกเธฑเธเธฃ', Icon: GitBranch },
+    interviews: { title: 'เธเธฑเธ”เธชเธฑเธกเธ เธฒเธฉเธ“เน', Icon: Calendar },
+    emails: { title: 'เธเธฑเธ”เธเธฒเธฃเธญเธตเน€เธกเธฅ', Icon: Mail },
+    offers: { title: 'เธเนเธญเน€เธชเธเธญเธเธฒเธ', Icon: FileText },
+    ranking: { title: 'เธเธฅเธเธฒเธฃเธเธฑเธ”เธญเธฑเธเธ”เธฑเธเธเธนเนเธชเธกเธฑเธเธฃ', Icon: BarChart3 },
+    comparison: { title: 'เธงเธดเน€เธเธฃเธฒเธฐเธซเนเนเธฅเธฐเน€เธเธฃเธตเธขเธเน€เธ—เธตเธขเธเนเธ”เธข AI', Icon: Zap },
     shortlist: { title: 'Shortlist', Icon: ClipboardList },
-    activity: { title: 'กิจกรรมล่าสุด', Icon: History },
+    activity: { title: 'เธเธดเธเธเธฃเธฃเธกเธฅเนเธฒเธชเธธเธ”', Icon: History },
   };
 
   const currentPage = pageInfo[activeTab];
 
   const sectionLabels = {
-    workspace: 'พื้นที่ทำงาน',
-    recruit: 'การสรรหา (Recruitment)',
-    analysis: 'การวิเคราะห์ (Analysis)',
-    results: 'ผลลัพธ์ (Results)',
+    workspace: 'เธเธทเนเธเธ—เธตเนเธ—เธณเธเธฒเธ',
+    recruit: 'เธเธฒเธฃเธชเธฃเธฃเธซเธฒ (Recruitment)',
+    analysis: 'เธเธฒเธฃเธงเธดเน€เธเธฃเธฒเธฐเธซเน (Analysis)',
+    results: 'เธเธฅเธฅเธฑเธเธเน (Results)',
   };
 
   // Group tabs by section
@@ -146,13 +146,13 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
 
   return (
     <div className="dashboard-layout">
-      {/* ── SIDEBAR ── */}
+      {/* โ”€โ”€ SIDEBAR โ”€โ”€ */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-logo">⚡</div>
+          <div className="sidebar-logo">โก</div>
           <div>
             <div className="sidebar-title">AI Job Matcher</div>
-            <div className="sidebar-subtitle">ระบบสรรหาอัจฉริยะ</div>
+            <div className="sidebar-subtitle">เธฃเธฐเธเธเธชเธฃเธฃเธซเธฒเธญเธฑเธเธเธฃเธดเธขเธฐ</div>
           </div>
         </div>
 
@@ -196,34 +196,34 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
                 {ROLE_LABELS[user?.role] || user?.role}
               </div>
             </div>
-            <button className="sidebar-logout" onClick={onLogout} title="ออกจากระบบ">
+            <button className="sidebar-logout" onClick={onLogout} title="เธญเธญเธเธเธฒเธเธฃเธฐเธเธ">
               <LogOut size={16} />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT ── */}
+      {/* โ”€โ”€ MAIN CONTENT โ”€โ”€ */}
       <div className="main-content">
         <header className="top-bar">
           <div className="top-bar-title">
             <currentPage.Icon size={20} className="page-icon" />
             <h1>{currentPage.title}</h1>
-            {selectedJob && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>— {selectedJob.title}</span>}
+            {selectedJob && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>โ€” {selectedJob.title}</span>}
           </div>
           <div className="top-bar-actions">
             <div className="status-chip">
               <span className="dot"></span>
-              <span>ผู้สมัคร {candidates.length} คน</span>
+              <span>เธเธนเนเธชเธกเธฑเธเธฃ {candidates.length} เธเธ</span>
             </div>
             <button
               className="auto-select-btn"
               onClick={() => handleRunAnalysis(true)}
               disabled={isAnalyzing || candidates.length === 0 || !jobReq.trim()}
-              title="ให้ AI ช่วยเลือกผู้สมัครที่ดีที่สุดให้ทันที"
+              title="เนเธซเน AI เธเนเธงเธขเน€เธฅเธทเธญเธเธเธนเนเธชเธกเธฑเธเธฃเธ—เธตเนเธ”เธตเธ—เธตเนเธชเธธเธ”เนเธซเนเธ—เธฑเธเธ—เธต"
             >
               <Zap size={14} />
-              {isAnalyzing ? 'กำลังประมวลผล…' : 'ค้นหาตัวท็อป'}
+              {isAnalyzing ? 'เธเธณเธฅเธฑเธเธเธฃเธฐเธกเธงเธฅเธเธฅโ€ฆ' : 'เธเนเธเธซเธฒเธ•เธฑเธงเธ—เนเธญเธ'}
             </button>
           </div>
         </header>

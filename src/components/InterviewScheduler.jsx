@@ -38,6 +38,7 @@ const InterviewScheduler = ({ job, user }) => {
   useEffect(() => {
     fetchInterviews();
     if (user?.role === 'ADMIN' || user?.role === 'HR_MANAGER') fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id]);
 
   const handleSchedule = async (e) => {

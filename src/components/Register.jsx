@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { User, Lock, Mail, ShieldCheck, Info } from 'lucide-react';
+﻿import React, { useState } from 'react';
+import { User, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { API_URL } from '../config.js';
 
-const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
+const Register = ({ onSwitchToLogin, onLogin }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -11,10 +11,10 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
   const [loading, setLoading] = useState(false);
 
   const passwordChecks = [
-    { label: 'อย่างน้อย 8 ตัวอักษร', test: (p) => p.length >= 8 },
-    { label: 'มีตัวพิมพ์ใหญ่ (A-Z)', test: (p) => /[A-Z]/.test(p) },
-    { label: 'มีตัวพิมพ์เล็ก (a-z)', test: (p) => /[a-z]/.test(p) },
-    { label: 'มีตัวเลข (0-9)', test: (p) => /[0-9]/.test(p) },
+    { label: 'เธญเธขเนเธฒเธเธเนเธญเธข 8 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ', test: (p) => p.length >= 8 },
+    { label: 'เธกเธตเธ•เธฑเธงเธเธดเธกเธเนเนเธซเธเน (A-Z)', test: (p) => /[A-Z]/.test(p) },
+    { label: 'เธกเธตเธ•เธฑเธงเธเธดเธกเธเนเน€เธฅเนเธ (a-z)', test: (p) => /[a-z]/.test(p) },
+    { label: 'เธกเธตเธ•เธฑเธงเน€เธฅเธ (0-9)', test: (p) => /[0-9]/.test(p) },
   ];
 
   const handleSubmit = async (e) => {
@@ -37,7 +37,7 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
         if (data.details) {
           setValidationErrors(data.details);
         } else {
-          throw new Error(data.error || 'ลงทะเบียนไม่สำเร็จ');
+          throw new Error(data.error || 'เธฅเธเธ—เธฐเน€เธเธตเธขเธเนเธกเนเธชเธณเน€เธฃเนเธ');
         }
         return;
       }
@@ -46,7 +46,7 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
       localStorage.setItem('user', JSON.stringify(data.user));
       onLogin(data.user);
     } catch (err) {
-      setError(err.message === 'User already exists' ? 'มีอีเมลนี้ในระบบแล้ว' : err.message);
+      setError(err.message === 'User already exists' ? 'เธกเธตเธญเธตเน€เธกเธฅเธเธตเนเนเธเธฃเธฐเธเธเนเธฅเนเธง' : err.message);
     } finally {
       setLoading(false);
     }
@@ -58,8 +58,8 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
         <div className="auth-brand-icon">
           <ShieldCheck size={24} style={{ color: 'var(--cyan)' }} />
         </div>
-        <h2 className="text-gradient">สร้างบัญชีใหม่</h2>
-        <p className="text-secondary">เข้าร่วมแพลตฟอร์มสรรหาด้วย AI</p>
+        <h2 className="text-gradient">เธชเธฃเนเธฒเธเธเธฑเธเธเธตเนเธซเธกเน</h2>
+        <p className="text-secondary">เน€เธเนเธฒเธฃเนเธงเธกเนเธเธฅเธ•เธเธญเธฃเนเธกเธชเธฃเธฃเธซเธฒเธ”เนเธงเธข AI</p>
       </div>
 
       {error && <div className="auth-error">{error}</div>}
@@ -76,14 +76,14 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
 
       <form onSubmit={handleSubmit} className="auth-form">
         <div>
-          <label className="input-label mb-2 block">ชื่อ - นามสกุล</label>
+          <label className="input-label mb-2 block">เธเธทเนเธญ - เธเธฒเธกเธชเธเธธเธฅ</label>
           <div className="auth-input-wrap">
             <User size={16} className="auth-input-icon" />
             <input
               type="text"
               required
               className="input-field"
-              placeholder="สมชาย ใจดี"
+              placeholder="เธชเธกเธเธฒเธข เนเธเธ”เธต"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -91,7 +91,7 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
         </div>
 
         <div>
-          <label className="input-label mb-2 block">อีเมล</label>
+          <label className="input-label mb-2 block">เธญเธตเน€เธกเธฅ</label>
           <div className="auth-input-wrap">
             <Mail size={16} className="auth-input-icon" />
             <input
@@ -106,14 +106,14 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
         </div>
 
         <div>
-          <label className="input-label mb-2 block">รหัสผ่าน</label>
+          <label className="input-label mb-2 block">เธฃเธซเธฑเธชเธเนเธฒเธ</label>
           <div className="auth-input-wrap">
             <Lock size={16} className="auth-input-icon" />
             <input
               type="password"
               required
               className="input-field"
-              placeholder="••••••••"
+              placeholder="โ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ข"
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -132,7 +132,7 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
                     color: check.test(password) ? 'var(--success)' : 'var(--text-muted)',
                   }}
                 >
-                  <span>{check.test(password) ? '✓' : '○'}</span>
+                  <span>{check.test(password) ? 'โ“' : 'โ—'}</span>
                   <span>{check.label}</span>
                 </div>
               ))}
@@ -146,13 +146,13 @@ const Register = ({ onRegisterSuccess, onSwitchToLogin, onLogin }) => {
           style={{ justifyContent: 'center', padding: '0.7rem 1.25rem' }}
           disabled={loading}
         >
-          {loading ? 'กำลังสร้างบัญชี...' : 'สมัครสมาชิก'}
+          {loading ? 'เธเธณเธฅเธฑเธเธชเธฃเนเธฒเธเธเธฑเธเธเธต...' : 'เธชเธกเธฑเธเธฃเธชเธกเธฒเธเธดเธ'}
         </button>
       </form>
 
       <div className="auth-footer">
-        มีบัญชีอยู่แล้ว?{' '}
-        <button onClick={onSwitchToLogin}>เข้าสู่ระบบ</button>
+        เธกเธตเธเธฑเธเธเธตเธญเธขเธนเนเนเธฅเนเธง?{' '}
+        <button onClick={onSwitchToLogin}>เน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ</button>
       </div>
     </div>
   );

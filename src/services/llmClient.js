@@ -1,9 +1,9 @@
-import * as pdfjsLib from 'pdfjs-dist';
+﻿import * as pdfjsLib from 'pdfjs-dist';
 import { API_URL } from '../config.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// ── Token Refresh Logic ──────────────────────────────────────────
+// โ”€โ”€ Token Refresh Logic โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 let isRefreshing = false;
 let refreshSubscribers = [];
 
@@ -49,7 +49,7 @@ const authFetch = async (url, options = {}) => {
           localStorage.setItem('user', JSON.stringify(data.user));
           onTokenRefreshed(data.token);
         } else {
-          // Refresh failed — force logout
+          // Refresh failed โ€” force logout
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           window.location.reload();
@@ -77,7 +77,7 @@ const authFetch = async (url, options = {}) => {
   return res;
 };
 
-// ── Public API ───────────────────────────────────────────────────
+// โ”€โ”€ Public API โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 
 export const judgeCandidates = async (jobReq, candidates) => {
   try {
@@ -160,7 +160,7 @@ export const extractResumeData = async (file) => {
 };
 
 // Expose mock for fast local offline testing if needed, though usually not called anymore.
-export const generateMockAnalysis = async (jobReq, candidates) => {
+export const generateMockAnalysis = async (_jobReq, _candidates) => {
   // legacy fallback
   return { rankedCandidates: [] };
 };

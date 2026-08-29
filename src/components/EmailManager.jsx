@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Send, Plus, Trash2 } from 'lucide-react';
+﻿import React, { useState, useEffect } from 'react';
+import { Mail, Send, Plus } from 'lucide-react';
 import { API_URL } from '../config.js';
 
 const EmailManager = ({ job, user }) => {
@@ -29,7 +29,27 @@ const EmailManager = ({ job, user }) => {
     if (res.ok) setSentEmails(await res.json());
   };
 
-  useEffect(() => { fetchTemplates(); fetchSent(); }, [job?.id]);
+  useEffect(() => {
+    let isMounted = true;
+    const loadData = async () => {
+      const token = localStorage.getItem('token');
+      const resT = await fetch(`${API_URL}/emails/templates`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (resT.ok && isMounted) setTemplates(await resT.json());
+
+      if (job?.id) {
+        const resS = await fetch(`${API_URL}/emails/sent?jobId=${job.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          credentials: 'include',
+        });
+        if (resS.ok && isMounted) setSentEmails(await resS.json());
+      }
+    };
+    loadData();
+    return () => { isMounted = false; };
+  }, [job?.id]);
 
   const handleCreateTemplate = async (e) => {
     e.preventDefault();

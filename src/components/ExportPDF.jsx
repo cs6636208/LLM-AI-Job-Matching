@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Download, FileText, Printer } from 'lucide-react';
+ import React, { useState } from 'react';
+import { Download } from 'lucide-react';
 import { API_URL } from '../config.js';
 
 const STAGE_LABELS = {
-  APPLIED: 'สมัคร', SCREENING: 'คัดกรอง', INTERVIEW: 'สัมภาษณ์',
-  OFFER: 'ยื่นข้อเสนอ', HIRED: 'จ้างงาน', REJECTED: 'ปฏิเสธ',
+  APPLIED: 'เธชเธกเธฑเธเธฃ', SCREENING: 'เธเธฑเธ”เธเธฃเธญเธ', INTERVIEW: 'เธชเธฑเธกเธ เธฒเธฉเธ“เน',
+  OFFER: 'เธขเธทเนเธเธเนเธญเน€เธชเธเธญ', HIRED: 'เธเนเธฒเธเธเธฒเธ', REJECTED: 'เธเธเธดเน€เธชเธ',
 };
 
 const ExportPDF = ({ job }) => {
@@ -33,7 +33,7 @@ const ExportPDF = ({ job }) => {
       printWindow.document.close();
     } catch (err) {
       console.error('Export error:', err);
-      alert('เกิดข้อผิดพลาดในการ export');
+      alert('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃ export');
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ const ExportPDF = ({ job }) => {
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>รายงานการคัดกรองผู้สมัคร - ${data.job.title}</title>
+  <title>เธฃเธฒเธขเธเธฒเธเธเธฒเธฃเธเธฑเธ”เธเธฃเธญเธเธเธนเนเธชเธกเธฑเธเธฃ - ${data.job.title}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 2rem; color: #1a1a1a; line-height: 1.6; }
@@ -68,58 +68,58 @@ const ExportPDF = ({ job }) => {
   </style>
 </head>
 <body>
-  <h1>📊 รายงานการคัดกรองผู้สมัคร</h1>
+  <h1>๐“ เธฃเธฒเธขเธเธฒเธเธเธฒเธฃเธเธฑเธ”เธเธฃเธญเธเธเธนเนเธชเธกเธฑเธเธฃ</h1>
 
   <div class="meta">
-    <div><strong>ตำแหน่ง:</strong> ${data.job.title}</div>
-    <div><strong>แผนก:</strong> ${data.job.department || '-'}</div>
-    <div><strong>สถานที่:</strong> ${data.job.location || '-'}</div>
-    <div><strong>ประเภท:</strong> ${data.job.employmentType || '-'}</div>
-    <div><strong>เงินเดือน:</strong> ${data.job.salaryRange || '-'}</div>
-    <div><strong>สถานะ:</strong> ${data.job.status}</div>
-    <div><strong>วันที่ Export:</strong> ${new Date(data.exportedAt).toLocaleString('th-TH')}</div>
-    <div><strong>Export โดย:</strong> ${data.exportedBy}</div>
+    <div><strong>เธ•เธณเนเธซเธเนเธ:</strong> ${data.job.title}</div>
+    <div><strong>เนเธเธเธ:</strong> ${data.job.department || '-'}</div>
+    <div><strong>เธชเธ–เธฒเธเธ—เธตเน:</strong> ${data.job.location || '-'}</div>
+    <div><strong>เธเธฃเธฐเน€เธ เธ—:</strong> ${data.job.employmentType || '-'}</div>
+    <div><strong>เน€เธเธดเธเน€เธ”เธทเธญเธ:</strong> ${data.job.salaryRange || '-'}</div>
+    <div><strong>เธชเธ–เธฒเธเธฐ:</strong> ${data.job.status}</div>
+    <div><strong>เธงเธฑเธเธ—เธตเน Export:</strong> ${new Date(data.exportedAt).toLocaleString('th-TH')}</div>
+    <div><strong>Export เนเธ”เธข:</strong> ${data.exportedBy}</div>
   </div>
 
   <div class="stats">
-    <div class="stat"><div class="num">${data.stats.total}</div><div class="label">ผู้สมัครทั้งหมด</div></div>
-    <div class="stat"><div class="num">${data.stats.applied}</div><div class="label">สมัคร</div></div>
-    <div class="stat"><div class="num">${data.stats.screening}</div><div class="label">คัดกรอง</div></div>
-    <div class="stat"><div class="num">${data.stats.interview}</div><div class="label">สัมภาษณ์</div></div>
-    <div class="stat"><div class="num">${data.stats.offer}</div><div class="label">ยื่นข้อเสนอ</div></div>
-    <div class="stat"><div class="num">${data.stats.hired}</div><div class="label">จ้างงาน</div></div>
-    <div class="stat"><div class="num">${data.stats.rejected}</div><div class="label">ปฏิเสธ</div></div>
+    <div class="stat"><div class="num">${data.stats.total}</div><div class="label">เธเธนเนเธชเธกเธฑเธเธฃเธ—เธฑเนเธเธซเธกเธ”</div></div>
+    <div class="stat"><div class="num">${data.stats.applied}</div><div class="label">เธชเธกเธฑเธเธฃ</div></div>
+    <div class="stat"><div class="num">${data.stats.screening}</div><div class="label">เธเธฑเธ”เธเธฃเธญเธ</div></div>
+    <div class="stat"><div class="num">${data.stats.interview}</div><div class="label">เธชเธฑเธกเธ เธฒเธฉเธ“เน</div></div>
+    <div class="stat"><div class="num">${data.stats.offer}</div><div class="label">เธขเธทเนเธเธเนเธญเน€เธชเธเธญ</div></div>
+    <div class="stat"><div class="num">${data.stats.hired}</div><div class="label">เธเนเธฒเธเธเธฒเธ</div></div>
+    <div class="stat"><div class="num">${data.stats.rejected}</div><div class="label">เธเธเธดเน€เธชเธ</div></div>
   </div>
 
   ${data.rubrics.length > 0 ? `
-  <h2>เกณฑ์การให้คะแนน</h2>
+  <h2>เน€เธเธ“เธ‘เนเธเธฒเธฃเนเธซเนเธเธฐเนเธเธ</h2>
   <table>
-    <tr><th>เกณฑ์</th><th>น้ำหนัก</th><th>รายละเอียด</th></tr>
+    <tr><th>เน€เธเธ“เธ‘เน</th><th>เธเนเธณเธซเธเธฑเธ</th><th>เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”</th></tr>
     ${data.rubrics.map(r => `<tr><td>${r.name}</td><td>${r.weight}%</td><td>${r.description || '-'}</td></tr>`).join('')}
   </table>` : ''}
 
-  ${Object.entries(data.pipeline).filter(([_, c]) => c.length > 0).map(([stage, candidates]) => `
-  <h2>${STAGE_LABELS[stage] || stage} (${candidates.length} คน)</h2>
+  ${Object.entries(data.pipeline).filter(([, c]) => c.length > 0).map(([stage, candidates]) => `
+  <h2>${STAGE_LABELS[stage] || stage} (${candidates.length} เธเธ)</h2>
   <table>
-    <tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>ประสบการณ์</th><th>การศึกษา</th><th>AI Score</th></tr>
+    <tr><th>เธเธทเนเธญ</th><th>เธ•เธณเนเธซเธเนเธ</th><th>เธเธฃเธฐเธชเธเธเธฒเธฃเธ“เน</th><th>เธเธฒเธฃเธจเธถเธเธฉเธฒ</th><th>AI Score</th></tr>
     ${candidates.map(c => `<tr>
-      <td>${c.name}</td><td>${c.role}</td><td>${c.experience} ปี</td><td>${c.education || '-'}</td>
+      <td>${c.name}</td><td>${c.role}</td><td>${c.experience} เธเธต</td><td>${c.education || '-'}</td>
       <td class="score">${c.aiScore || '-'}</td>
     </tr>`).join('')}
   </table>`).join('')}
 
   ${data.interviews.length > 0 ? `
-  <h2>นัดสัมภาษณ์</h2>
+  <h2>เธเธฑเธ”เธชเธฑเธกเธ เธฒเธฉเธ“เน</h2>
   ${data.interviews.map(i => `
     <div class="interview">
-      <strong>${i.candidate}</strong> — สัมภาษณ์โดย ${i.interviewer} | ${new Date(i.scheduledAt).toLocaleString('th-TH')} | ${i.status}
-      ${i.score ? ` | คะแนน: ${i.score}` : ''}
+      <strong>${i.candidate}</strong> โ€” เธชเธฑเธกเธ เธฒเธฉเธ“เนเนเธ”เธข ${i.interviewer} | ${new Date(i.scheduledAt).toLocaleString('th-TH')} | ${i.status}
+      ${i.score ? ` | เธเธฐเนเธเธ: ${i.score}` : ''}
       ${i.feedback ? `<br/><em>${i.feedback}</em>` : ''}
     </div>
   `).join('')}` : ''}
 
   <div class="no-print">
-    <button onclick="window.print()">🖨️ พิมพ์ / บันทึกเป็น PDF</button>
+    <button onclick="window.print()">๐–จ๏ธ เธเธดเธกเธเน / เธเธฑเธเธ—เธถเธเน€เธเนเธ PDF</button>
   </div>
 </body>
 </html>`;
@@ -127,7 +127,7 @@ const ExportPDF = ({ job }) => {
   return (
     <button className="btn btn-glow" onClick={generateReport} disabled={loading}>
       <Download size={14} />
-      {loading ? 'กำลังสร้าง...' : 'Export PDF Report'}
+      {loading ? 'เธเธณเธฅเธฑเธเธชเธฃเนเธฒเธ...' : 'Export PDF Report'}
     </button>
   );
 };

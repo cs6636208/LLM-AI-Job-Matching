@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, CheckCircle, XCircle, Plus, DollarSign } from 'lucide-react';
+﻿import React, { useState, useEffect } from 'react';
+import { CheckCircle, XCircle, Plus, DollarSign } from 'lucide-react';
 import { API_URL } from '../config.js';
 
 const STATUS_MAP = {
@@ -24,7 +24,20 @@ const OfferManager = ({ job, user }) => {
     if (res.ok) setOffers(await res.json());
   };
 
-  useEffect(() => { fetchOffers(); }, [job?.id]);
+  useEffect(() => {
+    let isMounted = true;
+    const loadOffers = async () => {
+      if (!job?.id) return;
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/offers?jobId=${job.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (res.ok && isMounted) setOffers(await res.json());
+    };
+    loadOffers();
+    return () => { isMounted = false; };
+  }, [job?.id]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

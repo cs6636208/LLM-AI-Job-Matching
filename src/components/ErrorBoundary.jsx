@@ -1,7 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 
 /**
- * React Error Boundary — catches JavaScript errors in child components
+ * React Error Boundary โ€” catches JavaScript errors in child components
  * during rendering, lifecycle methods, and constructors.
  *
  * Usage:
@@ -42,14 +42,14 @@ class ErrorBoundary extends React.Component {
           <div className="auth-page">
             <div className="auth-card" style={{ maxWidth: '480px', textAlign: 'center' }}>
               <div className="auth-brand">
-                <div className="auth-brand-icon" style={{ fontSize: '3rem' }}>💥</div>
-                <h2 className="text-gradient">เกิดข้อผิดพลาด</h2>
+                <div className="auth-brand-icon" style={{ fontSize: '3rem' }}>๐’ฅ</div>
+                <h2 className="text-gradient">เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”</h2>
                 <p className="text-secondary" style={{ marginTop: '0.75rem', lineHeight: '1.6' }}>
-                  ระบบพบปัญหาที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง
+                  เธฃเธฐเธเธเธเธเธเธฑเธเธซเธฒเธ—เธตเนเนเธกเนเธเธฒเธ”เธเธดเธ” เธเธฃเธธเธ“เธฒเธฅเธญเธเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธ
                 </p>
               </div>
 
-              {process.env.NODE_ENV !== 'production' && this.state.error && (
+              {import.meta.env.DEV && this.state.error && (
                 <details
                   style={{
                     marginTop: '1rem',
@@ -64,7 +64,7 @@ class ErrorBoundary extends React.Component {
                   }}
                 >
                   <summary style={{ cursor: 'pointer', marginBottom: '0.5rem' }}>
-                    รายละเอียดข้อผิดพลาด (Dev Mode)
+                    เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ” (Dev Mode)
                   </summary>
                   <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
                     {this.state.error.message}
@@ -79,7 +79,7 @@ class ErrorBoundary extends React.Component {
                 style={{ justifyContent: 'center' }}
                 onClick={this.handleReset}
               >
-                ลองใหม่
+                เธฅเธญเธเนเธซเธกเน
               </button>
 
               <button
@@ -87,7 +87,7 @@ class ErrorBoundary extends React.Component {
                 style={{ justifyContent: 'center' }}
                 onClick={() => window.location.reload()}
               >
-                รีเฟรชหน้า
+                เธฃเธตเน€เธเธฃเธเธซเธเนเธฒ
               </button>
             </div>
           </div>

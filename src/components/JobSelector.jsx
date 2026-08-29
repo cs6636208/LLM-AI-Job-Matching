@@ -30,6 +30,7 @@ const JobSelector = ({ selectedJob, setSelectedJob, user, refreshTrigger }) => {
 
   useEffect(() => {
     fetchJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger]);
 
   const handleCreate = async (e) => {
