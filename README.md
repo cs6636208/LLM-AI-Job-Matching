@@ -17,6 +17,28 @@ An advanced, full-stack recruitment platform powered by **Typhoon AI**. This sys
 -   **Database:** Prisma ORM with SQLite (Local).
 -   **AI Engine:** Typhoon AI API (`typhoon-v2.5-30b-a3b-instruct`).
 
+## Public candidate portal
+
+The candidate-facing job board is available at `/jobs` and can be deployed behind the same domain as the HR workspace. It supports public job discovery and submits applications through:
+
+- `GET /api/public/jobs`
+- `GET /api/public/jobs/:jobId`
+- `POST /api/public/jobs/:jobId/applications`
+- `GET /api/applications` (authenticated HR inbox)
+- `PUT /api/applications/:id` (authenticated HR status update)
+
+Resume files are currently stored as application metadata (`resumeName`). For production, connect the upload flow to S3/MinIO and store only a signed object URL in `resumeUrl`.
+
+## Docker
+
+Create a root `.env` with `JWT_SECRET`, `JWT_REFRESH_SECRET`, and optionally `TYPHOON_API_KEY`, then run:
+
+```bash
+docker compose up --build
+```
+
+The public site and HR workspace are served at `http://localhost:8080`. The API is also exposed at `http://localhost:5000` and the API documentation at `http://localhost:5000/api-docs`.
+
 ## Getting Started
 
 ### Prerequisites

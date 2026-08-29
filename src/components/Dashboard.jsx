@@ -2,7 +2,7 @@
 import { 
   Sparkles, ClipboardList, LogOut, User, BarChart3, Briefcase, 
   GitBranch, Calendar, Mail, FileText, History, Zap, Search,
-  ChevronRight, Building2, Layers
+  ChevronRight, Building2, Layers, Inbox
 } from 'lucide-react';
 import JobRequirementsForm from './JobRequirementsForm';
 import CandidateRanking from './CandidateRanking';
@@ -15,6 +15,7 @@ import EmailManager from './EmailManager';
 import OfferManager from './OfferManager';
 import ActivityLog from './ActivityLog';
 import ExportPDF from './ExportPDF';
+import ApplicationsInbox from './ApplicationsInbox';
 import CandidateDetailDrawer from './CandidateDetailDrawer';
 import { analyzeCandidates } from '../services/llmClient';
 import { useToast } from '../context/ToastContext';
@@ -106,6 +107,7 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
   // ── Enterprise Navigation Tabs ──────────────────────────────────
   const tabs = [
     { id: 'requirements', label: 'รายละเอียดและคุณสมบัติงาน', Icon: Briefcase, section: 'workspace' },
+    { id: 'applications', label: 'ใบสมัครเข้าใหม่', Icon: Inbox, section: 'recruit', badge: 0 },
     { id: 'pipeline', label: 'Pipeline ผู้สมัคร', Icon: GitBranch, section: 'recruit', disabled: !selectedJob },
     { id: 'interviews', label: 'นัดสัมภาษณ์', Icon: Calendar, section: 'recruit', disabled: !selectedJob },
     { id: 'emails', label: 'ศูนย์การติดต่อ (อีเมล)', Icon: Mail, section: 'recruit', disabled: !selectedJob },
@@ -118,6 +120,7 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
 
   const pageInfo = {
     requirements: { title: 'ระบบคัดกรองและบริหารความต้องการตำแหน่งงาน', subtitle: 'กำหนด Job Specification และจัดการคลังข้อมูลเรซูเม่', Icon: Briefcase },
+    applications: { title: 'Candidate Applications Inbox', subtitle: 'ตรวจสอบใบสมัครจากหน้า Careers และส่งต่อเข้าสู่กระบวนการสรรหา', Icon: Inbox },
     pipeline: { title: 'Talent Acquisition Pipeline', subtitle: 'ติดตามสถานะผู้สมัครในแต่ละขั้นตอนกระบวนการสรรหา', Icon: GitBranch },
     interviews: { title: 'Interview Management Hub', subtitle: 'กำหนดการนัดสัมภาษณ์และบันทึกคะแนนการประเมิน', Icon: Calendar },
     emails: { title: 'Corporate Candidate Communications', subtitle: 'ส่งอีเมลแจ้งผล นัดสัมภาษณ์ และส่งข้อเสนองานผ่านเทมเพลต', Icon: Mail },
@@ -129,6 +132,7 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
   };
 
   const currentPage = pageInfo[activeTab] || pageInfo['requirements'];
+  const PageIcon = currentPage.Icon;
 
   const sectionLabels = {
     workspace: 'ตำแหน่งงานและคลังข้อมูล',
@@ -280,6 +284,29 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
 
         {/* ── 3. MAIN WORKSPACE ── */}
         <main className="enterprise-main-area">
+
+          {/* Workspace context header */}
+          <div className="workspace-page-header">
+            <div className="workspace-heading-group">
+              <div className="workspace-eyebrow">
+                <span className="eyebrow-dot"></span>
+                RECRUITING OPERATIONS / {activeTab.toUpperCase()}
+              </div>
+              <div className="workspace-title-row">
+                <div className="workspace-title-icon">
+                  <PageIcon size={20} />
+                </div>
+                <div>
+                  <h1 className="workspace-page-title">{currentPage.title}</h1>
+                  <p className="workspace-page-subtitle">{currentPage.subtitle}</p>
+                </div>
+              </div>
+            </div>
+            <div className="workspace-header-meta">
+              <div className="header-live-status"><span className="header-live-dot"></span> AI workspace online</div>
+              <div className="header-date">ข้อมูลอัปเดตแบบต่อเนื่อง</div>
+            </div>
+          </div>
           
           {/* Executive KPI Summary Cards */}
           <div className="executive-kpi-grid">
@@ -341,6 +368,12 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
                 candidates={candidates}
                 searchQuery={searchQuery}
                 onSelectCandidate={(c) => setInspectCandidate(c)}
+              />
+            )}
+            {activeTab === 'applications' && (
+              <ApplicationsInbox
+                job={selectedJob}
+                onSelectCandidate={(candidate) => setInspectCandidate(candidate)}
               />
             )}
             {activeTab === 'pipeline' && (

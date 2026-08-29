@@ -4,6 +4,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Register from './components/Register';
+import CandidateJobsPage from './components/CandidateJobsPage';
 import { ToastProvider } from './context/ToastContext';
 import { API_URL } from './config.js';
 
@@ -12,6 +13,7 @@ function AppContent() {
   const [user, setUser] = useState(null);
   const [showRegister, setShowRegister] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
+  const isCandidatePortal = window.location.pathname.startsWith('/jobs');
 
   useEffect(() => {
     let isMounted = true;
@@ -48,6 +50,10 @@ function AppContent() {
     verifyToken();
     return () => { isMounted = false; };
   }, []);
+
+  if (isCandidatePortal) {
+    return <CandidateJobsPage />;
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token');

@@ -24,6 +24,7 @@ import offerRoutes from './routes/offers.js';
 import emailRoutes from './routes/emails.js';
 import exportRoutes from './routes/export.js';
 import bulkRoutes from './routes/bulk.js';
+import applicationRoutes from './routes/applications.js';
 
 dotenv.config();
 
@@ -40,9 +41,24 @@ app.use(httpLogger);
 app.use(helmet());
 app.use(cookieParser());
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
-  .map(o => o.trim());
+  .map(o => o.trim())
+  .filter(Boolean);
+
+// Vite may move from 5173 to 5174 when the first port is occupied.
+// Keep this convenience limited to local development; production still uses
+// the explicit ALLOWED_ORIGINS allow-list.
+const developmentOrigins = process.env.NODE_ENV === 'production'
+  ? []
+  : [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:5174',
+    ];
+
+const allowedOrigins = [...new Set([...developmentOrigins, ...configuredOrigins])];
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -82,6 +98,10 @@ app.use('/api/offers', apiRateLimit, offerRoutes);
 app.use('/api/emails', apiRateLimit, emailRoutes);
 app.use('/api/export', apiRateLimit, exportRoutes);
 app.use('/api/bulk', apiRateLimit, bulkRoutes);
+// Public job board/application endpoints share the same rate limit by IP when unauthenticated.
+app.use('/api/public', apiRateLimit, applicationRoutes);
+// Authenticated HR application inbox/status management.
+app.use('/api/applications', apiRateLimit, applicationRoutes);
 
 // ── Health Check ─────────────────────────────────────────────────
 

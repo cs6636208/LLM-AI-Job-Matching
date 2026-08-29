@@ -91,6 +91,7 @@ model Job {
   // Relations
   user              User              @relation(fields: [userId], references: [id])
   jobCandidates     JobCandidate[]
+  applications      Application[]
   rubrics           Rubric[]
   sentEmails        SentEmail[]
   interviews        Interview[]
@@ -119,12 +120,34 @@ model Candidate {
 
   // Relations
   jobCandidates     JobCandidate[]
+  applications      Application[]
   shortlists        Shortlist[]
   notes             Note[]
   interviews        Interview[]
   offers            Offer[]
 
   @@index([name])
+}
+
+// ── Public candidate applications ────────────────────────────────────────
+model Application {
+  id               Int      @id @default(autoincrement())
+  jobId            Int
+  candidateId      String
+  resumeName       String?
+  resumeUrl        String?  // Reserved for S3/MinIO object storage in production
+  coverNote        String?
+  consentAccepted  Boolean  @default(false)
+  status           String   @default("NEW") // NEW, REVIEWING, INTERVIEW, REJECTED, HIRED
+  appliedAt        DateTime @default(now())
+  updatedAt        DateTime @default(now())
+
+  job              Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate        Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, candidateId])
+  @@index([jobId, status])
+  @@index([candidateId, appliedAt])
 }
 
 // ── Job ↔ Candidate junction (Multi-Job support) ─────────────────

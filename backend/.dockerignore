@@ -1,0 +1,7 @@
+node_modules
+.env
+dev.db
+*.log
+__tests__
+prisma_out.txt
+validate_err.txt
