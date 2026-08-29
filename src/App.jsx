@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import './App.css';
 import ErrorBoundary from './components/ErrorBoundary';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Register from './components/Register';
+import { ToastProvider } from './context/ToastContext';
 import { API_URL } from './config.js';
 
 function AppContent() {
@@ -13,12 +14,13 @@ function AppContent() {
   const [isVerifying, setIsVerifying] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     const verifyToken = async () => {
       const token = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
 
       if (!token || !storedUser) {
-        setIsVerifying(false);
+        if (isMounted) setIsVerifying(false);
         return;
       }
 
@@ -28,22 +30,23 @@ function AppContent() {
           credentials: 'include',
         });
 
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const data = await res.json();
           setUser(data.user);
-        } else {
+        } else if (isMounted) {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
       } catch (err) {
         console.warn('Backend unreachable, using cached session:', err.message);
-        setUser(JSON.parse(storedUser));
+        if (isMounted) setUser(JSON.parse(storedUser));
       } finally {
-        setIsVerifying(false);
+        if (isMounted) setIsVerifying(false);
       }
     };
 
     verifyToken();
+    return () => { isMounted = false; };
   }, []);
 
   const handleLogout = () => {
@@ -55,14 +58,10 @@ function AppContent() {
   if (isVerifying) {
     return (
       <div className="app-root">
-        <div className="bg-grid"></div>
-        <div className="bg-orb orb-1"></div>
-        <div className="bg-orb orb-2"></div>
-        <div className="bg-orb orb-3"></div>
         <div className="auth-page">
           <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚡</div>
-            <p>กำลังตรวจสอบเซสชัน...</p>
+            <div className="spinner-border mb-3" style={{ width: '28px', height: '28px' }}></div>
+            <p className="font-medium text-slate-700">กำลังตรวจสอบสิทธิ์การเข้าใช้งานองค์กร...</p>
           </div>
         </div>
       </div>
@@ -71,26 +70,18 @@ function AppContent() {
 
   return (
     <div className="app-root">
-      <div className="bg-grid"></div>
-      <div className="bg-orb orb-1"></div>
-      <div className="bg-orb orb-2"></div>
-      <div className="bg-orb orb-3"></div>
-
       {!user ? (
-        <div className="auth-page">
-          {showRegister ? (
-            <Register
-              onSwitchToLogin={() => setShowRegister(false)}
-              onRegisterSuccess={() => setShowRegister(false)}
-              onLogin={(userData) => setUser(userData)}
-            />
-          ) : (
-            <Login
-              onSwitchToRegister={() => setShowRegister(true)}
-              onLogin={(userData) => setUser(userData)}
-            />
-          )}
-        </div>
+        showRegister ? (
+          <Register
+            onSwitchToLogin={() => setShowRegister(false)}
+            onLogin={(userData) => setUser(userData)}
+          />
+        ) : (
+          <Login
+            onSwitchToRegister={() => setShowRegister(true)}
+            onLogin={(userData) => setUser(userData)}
+          />
+        )
       ) : (
         <Dashboard
           candidates={candidates}
@@ -106,7 +97,9 @@ function AppContent() {
 function App() {
   return (
     <ErrorBoundary>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

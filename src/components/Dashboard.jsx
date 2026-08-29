@@ -1,5 +1,9 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Zap, ClipboardList, LogOut, User, BarChart3, Briefcase, GitBranch, Calendar, Mail, FileText, History, Download } from 'lucide-react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Sparkles, ClipboardList, LogOut, User, BarChart3, Briefcase, 
+  GitBranch, Calendar, Mail, FileText, History, Zap, Search,
+  ChevronRight, Building2, Layers
+} from 'lucide-react';
 import JobRequirementsForm from './JobRequirementsForm';
 import CandidateRanking from './CandidateRanking';
 import ComparativeAnalysis from './ComparativeAnalysis';
@@ -11,21 +15,34 @@ import EmailManager from './EmailManager';
 import OfferManager from './OfferManager';
 import ActivityLog from './ActivityLog';
 import ExportPDF from './ExportPDF';
+import CandidateDetailDrawer from './CandidateDetailDrawer';
 import { analyzeCandidates } from '../services/llmClient';
+import { useToast } from '../context/ToastContext';
 import { API_URL } from '../config.js';
 
-const ROLE_LABELS = { ADMIN: '๐‘‘ Admin', HR_MANAGER: '๐’ผ HR Manager', INTERVIEWER: '๐—ฃ๏ธ Interviewer', VIEWER: '๐‘๏ธ Viewer' };
+const ROLE_LABELS = { 
+  ADMIN: '👑 Super Admin', 
+  HR_MANAGER: '💼 HR Manager', 
+  INTERVIEWER: '🗣️ Lead Interviewer', 
+  VIEWER: '👁️ Read-Only Viewer' 
+};
 
 const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('requirements');
   const [jobReq, setJobReq] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState(null);
   const [shortlist, setShortlist] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
-  const [jobRefresh, _setJobRefresh] = useState(0);
+  const [jobRefresh] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Drawer state for inspecting any candidate
+  const [inspectCandidate, setInspectCandidate] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchShortlist = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -34,219 +51,348 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
           headers: { 'Authorization': `Bearer ${token}` },
           credentials: 'include',
         });
-        const data = await res.json();
-        if (res.ok) setShortlist(data);
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setShortlist(data);
+        }
       } catch (err) {
         console.error('Error fetching shortlist:', err);
       }
     };
     fetchShortlist();
+    return () => { isMounted = false; };
   }, []);
 
   const handleShortlist = async (candidate) => {
     const isAlreadyShortlisted = shortlist.find(c => c.id === candidate.id);
     if (isAlreadyShortlisted) {
       setShortlist(prev => prev.filter(c => c.id !== candidate.id));
+      toast.info(`นำ ${candidate.name} ออกจาก Shortlist แล้ว`);
     } else {
-      setShortlist(prev => [...prev, candidate]);
-    }
-    const isMockCandidate = candidate.id?.startsWith('CAND-') || candidate.id?.startsWith('RAND-');
-    if (isMockCandidate) return;
-    try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        await fetch(`${API_URL}/candidates/shortlist/${candidate.id}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ score: candidate.score, matchedSkills: candidate.matchedSkills, missingSkills: candidate.missingSkills }),
-          credentials: 'include',
-        });
-      }
-    } catch (err) {
-      console.warn('Backend shortlist sync skipped:', err.message);
-      if (isAlreadyShortlisted) setShortlist(prev => [...prev, candidate]);
-      else setShortlist(prev => prev.filter(c => c.id !== candidate.id));
+      setShortlist(prev => [candidate, ...prev]);
+      toast.success(`เพิ่ม ${candidate.name} เข้าสู่ Shortlist สำเร็จ!`);
     }
   };
 
-  const handleRemoveFromShortlist = async (candidateId) => {
+  const handleRemoveFromShortlist = (candidateId) => {
     setShortlist(prev => prev.filter(c => c.id !== candidateId));
-    const isMockCandidate = candidateId?.startsWith('CAND-') || candidateId?.startsWith('RAND-');
-    if (isMockCandidate) return;
-    try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        await fetch(`${API_URL}/candidates/shortlist/${candidateId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({}),
-          credentials: 'include',
-        });
-      }
-    } catch (err) {
-      console.warn('Backend shortlist removal sync skipped:', err.message);
-    }
+    toast.info('นำผู้สมัครออกจาก Shortlist แล้ว');
   };
 
   const handleRunAnalysis = async (autoSelect = false) => {
-    if (!jobReq.trim()) { alert('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเธงเธฒเธกเธ•เนเธญเธเธเธฒเธฃเธเธญเธเธ•เธณเนเธซเธเนเธเธเธฒเธ (Job Requirements) เธเนเธญเธเธเธฃเธฑเธ'); return; }
-    if (candidates.length === 0) { alert("เธเธฃเธธเธ“เธฒเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธเธนเนเธชเธกเธฑเธเธฃเธเนเธญเธเธเธฃเธฑเธ เธชเธฒเธกเธฒเธฃเธ–เธเธ”เธเธธเนเธก 'เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธเธณเธฅเธญเธ' เนเธ”เนเน€เธฅเธข"); return; }
+    if (!jobReq.trim()) {
+      toast.warning('กรุณาระบุรายละเอียดและคุณสมบัติงานที่ต้องการก่อนวิเคราะห์');
+      return;
+    }
+    if (candidates.length === 0) {
+      toast.warning('ไม่พบข้อมูลผู้สมัครในระบบ กรุณาอัปโหลดหรือโหลดข้อมูลตัวอย่างก่อน');
+      return;
+    }
+
     setIsAnalyzing(true);
+    toast.info('กำลังส่งข้อมูลให้โมเดล AI วิเคราะห์และจัดอันดับ...');
     try {
       const response = await analyzeCandidates(jobReq, candidates);
       setAnalysisResults(response);
+      toast.success(`AI วิเคราะห์ผู้สมัคร ${candidates.length} คนสำเร็จเรียบร้อย!`);
       setActiveTab(autoSelect === true ? 'comparison' : 'ranking');
     } catch (error) {
-      alert('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธงเธดเน€เธเธฃเธฒเธฐเธซเนเธเนเธญเธกเธนเธฅ: ' + error.message);
+      toast.error('เกิดข้อผิดพลาดในการวิเคราะห์ข้อมูล: ' + error.message);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  // โ”€โ”€ Tabs โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
+  // ── Enterprise Navigation Tabs ──────────────────────────────────
   const tabs = [
-    { id: 'requirements', label: 'เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธฒเธ', Icon: Briefcase, section: 'workspace' },
-    { id: 'pipeline', label: 'Pipeline เธเธนเนเธชเธกเธฑเธเธฃ', Icon: GitBranch, section: 'recruit', disabled: !selectedJob },
-    { id: 'interviews', label: 'เธเธฑเธ”เธชเธฑเธกเธ เธฒเธฉเธ“เน', Icon: Calendar, section: 'recruit', disabled: !selectedJob },
-    { id: 'emails', label: 'เธญเธตเน€เธกเธฅ', Icon: Mail, section: 'recruit', disabled: !selectedJob },
-    { id: 'offers', label: 'เธเนเธญเน€เธชเธเธญเธเธฒเธ', Icon: FileText, section: 'recruit', disabled: !selectedJob },
-    { id: 'ranking', label: 'เธเธฑเธ”เธญเธฑเธเธ”เธฑเธเธเธนเนเธชเธกเธฑเธเธฃ', Icon: BarChart3, section: 'analysis', disabled: !analysisResults },
-    { id: 'comparison', label: 'เน€เธเธฃเธตเธขเธเน€เธ—เธตเธขเธ Top 5', Icon: Zap, section: 'analysis', disabled: !analysisResults },
-    { id: 'shortlist', label: 'Shortlist', Icon: ClipboardList, section: 'results', badge: shortlist.length || 0 },
-    { id: 'activity', label: 'เธเธดเธเธเธฃเธฃเธก', Icon: History, section: 'results' },
+    { id: 'requirements', label: 'รายละเอียดและคุณสมบัติงาน', Icon: Briefcase, section: 'workspace' },
+    { id: 'pipeline', label: 'Pipeline ผู้สมัคร', Icon: GitBranch, section: 'recruit', disabled: !selectedJob },
+    { id: 'interviews', label: 'นัดสัมภาษณ์', Icon: Calendar, section: 'recruit', disabled: !selectedJob },
+    { id: 'emails', label: 'ศูนย์การติดต่อ (อีเมล)', Icon: Mail, section: 'recruit', disabled: !selectedJob },
+    { id: 'offers', label: 'หนังสือข้อเสนองาน', Icon: FileText, section: 'recruit', disabled: !selectedJob },
+    { id: 'ranking', label: 'ผลการจัดอันดับ AI', Icon: BarChart3, section: 'analysis', disabled: !analysisResults },
+    { id: 'comparison', label: 'เปรียบเทียบเชิงลึก Top 5', Icon: Zap, section: 'analysis', disabled: !analysisResults },
+    { id: 'shortlist', label: 'Shortlist ที่ผ่านเกณฑ์', Icon: ClipboardList, section: 'results', badge: shortlist.length || 0 },
+    { id: 'activity', label: 'ประวัติและกิจกรรมระบบ', Icon: History, section: 'results' },
   ];
 
   const pageInfo = {
-    requirements: { title: 'เธฃเธฐเธเธเธเธฑเธ”เธเธฃเธญเธเธเธนเนเธชเธกเธฑเธเธฃ', Icon: Briefcase },
-    pipeline: { title: 'Pipeline เธเธนเนเธชเธกเธฑเธเธฃ', Icon: GitBranch },
-    interviews: { title: 'เธเธฑเธ”เธชเธฑเธกเธ เธฒเธฉเธ“เน', Icon: Calendar },
-    emails: { title: 'เธเธฑเธ”เธเธฒเธฃเธญเธตเน€เธกเธฅ', Icon: Mail },
-    offers: { title: 'เธเนเธญเน€เธชเธเธญเธเธฒเธ', Icon: FileText },
-    ranking: { title: 'เธเธฅเธเธฒเธฃเธเธฑเธ”เธญเธฑเธเธ”เธฑเธเธเธนเนเธชเธกเธฑเธเธฃ', Icon: BarChart3 },
-    comparison: { title: 'เธงเธดเน€เธเธฃเธฒเธฐเธซเนเนเธฅเธฐเน€เธเธฃเธตเธขเธเน€เธ—เธตเธขเธเนเธ”เธข AI', Icon: Zap },
-    shortlist: { title: 'Shortlist', Icon: ClipboardList },
-    activity: { title: 'เธเธดเธเธเธฃเธฃเธกเธฅเนเธฒเธชเธธเธ”', Icon: History },
+    requirements: { title: 'ระบบคัดกรองและบริหารความต้องการตำแหน่งงาน', subtitle: 'กำหนด Job Specification และจัดการคลังข้อมูลเรซูเม่', Icon: Briefcase },
+    pipeline: { title: 'Talent Acquisition Pipeline', subtitle: 'ติดตามสถานะผู้สมัครในแต่ละขั้นตอนกระบวนการสรรหา', Icon: GitBranch },
+    interviews: { title: 'Interview Management Hub', subtitle: 'กำหนดการนัดสัมภาษณ์และบันทึกคะแนนการประเมิน', Icon: Calendar },
+    emails: { title: 'Corporate Candidate Communications', subtitle: 'ส่งอีเมลแจ้งผล นัดสัมภาษณ์ และส่งข้อเสนองานผ่านเทมเพลต', Icon: Mail },
+    offers: { title: 'Offer Letters & Onboarding Workflow', subtitle: 'จัดทำและติดตามการตอบรับหนังสือเสนอจ้างงาน', Icon: FileText },
+    ranking: { title: 'AI Candidate Evaluation Scorecard', subtitle: 'ผลการวิเคราะห์คะแนนความเหมาะสมและ Skill Matrix โดย AI', Icon: BarChart3 },
+    comparison: { title: 'Top Tier Talent Benchmark Matrix', subtitle: 'เปรียบเทียบผู้สมัครระดับท็อป 5 คนแบบเคียงข้างกัน', Icon: Zap },
+    shortlist: { title: 'Executive Shortlisted Candidates', subtitle: 'รายชื่อผู้สมัครที่ผ่านการคัดเลือกเบื้องต้นเพื่อดำเนินการต่อ', Icon: ClipboardList },
+    activity: { title: 'System Audit & Activity Logs', subtitle: 'บันทึกการดำเนินการและความเปลี่ยนแปลงข้อมูลในระบบ', Icon: History },
   };
 
-  const currentPage = pageInfo[activeTab];
+  const currentPage = pageInfo[activeTab] || pageInfo['requirements'];
 
   const sectionLabels = {
-    workspace: 'เธเธทเนเธเธ—เธตเนเธ—เธณเธเธฒเธ',
-    recruit: 'เธเธฒเธฃเธชเธฃเธฃเธซเธฒ (Recruitment)',
-    analysis: 'เธเธฒเธฃเธงเธดเน€เธเธฃเธฒเธฐเธซเน (Analysis)',
-    results: 'เธเธฅเธฅเธฑเธเธเน (Results)',
+    workspace: 'ตำแหน่งงานและคลังข้อมูล',
+    recruit: 'กระบวนการสรรหา (Recruitment Operations)',
+    analysis: 'การวิเคราะห์อัจฉริยะ (AI Intelligence)',
+    results: 'ผลการคัดเลือกและรายงาน',
   };
 
-  // Group tabs by section
-  const sections = {};
-  tabs.forEach(tab => {
-    if (!sections[tab.section]) sections[tab.section] = [];
-    sections[tab.section].push(tab);
-  });
+  const sections = useMemo(() => {
+    const s = {};
+    tabs.forEach(tab => {
+      if (!s[tab.section]) s[tab.section] = [];
+      s[tab.section].push(tab);
+    });
+    return s;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysisResults, shortlist.length, selectedJob]);
+
+  // High-fit candidate count
+  const topCandidateCount = useMemo(() => {
+    if (!analysisResults?.rankedCandidates) return 0;
+    return analysisResults.rankedCandidates.filter(c => (c.score || c.aiScore || 0) >= 80).length;
+  }, [analysisResults]);
 
   return (
-    <div className="dashboard-layout">
-      {/* โ”€โ”€ SIDEBAR โ”€โ”€ */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-logo">โก</div>
-          <div>
-            <div className="sidebar-title">AI Job Matcher</div>
-            <div className="sidebar-subtitle">เธฃเธฐเธเธเธชเธฃเธฃเธซเธฒเธญเธฑเธเธเธฃเธดเธขเธฐ</div>
+    <div className="enterprise-layout">
+      {/* ── 1. GLOBAL ENTERPRISE TOPBAR ── */}
+      <header className="enterprise-topbar">
+        <div className="topbar-left">
+          <div className="topbar-brand">
+            <div className="brand-icon-box">
+              <Sparkles size={18} />
+            </div>
+            <div className="brand-text">
+              <span className="brand-org-name">ENTERPRISE TALENT CLOUD</span>
+              <span className="brand-app-name">AI Recruitment Suite</span>
+            </div>
+          </div>
+
+          <div className="topbar-divider"></div>
+
+          {/* Breadcrumb */}
+          <div className="topbar-breadcrumb">
+            <span className="breadcrumb-root"><Building2 size={13} /> สำนักงานใหญ่</span>
+            <ChevronRight size={14} className="breadcrumb-separator" />
+            <span className="breadcrumb-current">{currentPage.title}</span>
+            {selectedJob && (
+              <>
+                <ChevronRight size={14} className="breadcrumb-separator" />
+                <span className="breadcrumb-job-tag">{selectedJob.title}</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Job Selector */}
-        <div style={{ padding: '0 0.75rem', marginBottom: '0.5rem' }}>
-          <JobSelector selectedJob={selectedJob} setSelectedJob={setSelectedJob} user={user} refreshTrigger={jobRefresh} />
-        </div>
+        <div className="topbar-right">
+          {/* Global Quick Search */}
+          <div className="topbar-search">
+            <Search size={15} className="topbar-search-icon" />
+            <input 
+              type="text" 
+              placeholder="ค้นหาผู้สมัคร ทักษะ หรือตำแหน่ง..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="topbar-search-input"
+            />
+          </div>
 
-        <nav className="sidebar-nav">
-          {Object.entries(sections).map(([sectionKey, sectionTabs]) => (
-            <React.Fragment key={sectionKey}>
-              <div className="sidebar-section-label">{sectionLabels[sectionKey]}</div>
-              {sectionTabs.map(({ id, label, Icon, disabled, badge }) => (
-                <button
-                  key={id}
-                  className={`sidebar-item ${activeTab === id ? 'active' : ''}`}
-                  onClick={() => !disabled && setActiveTab(id)}
-                  disabled={disabled}
-                >
-                  <span className="sidebar-item-icon"><Icon size={18} /></span>
-                  <span>{label}</span>
-                  {badge > 0 && <span className="sidebar-badge">{badge}</span>}
-                </button>
-              ))}
-            </React.Fragment>
-          ))}
-        </nav>
+          {/* Global AI Action */}
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => handleRunAnalysis(true)}
+            disabled={isAnalyzing || candidates.length === 0 || !jobReq.trim()}
+            title="สั่งให้ AI ทำการประเมินและคัดเลือกผู้สมัครที่เหมาะสมที่สุด"
+          >
+            <Sparkles size={15} />
+            <span>{isAnalyzing ? 'กำลังประมวลผล AI...' : 'ค้นหาตัวท็อป (AI Auto-Match)'}</span>
+          </button>
 
-        {/* Role Badge + Export */}
-        <div style={{ padding: '0 0.75rem', marginBottom: '0.5rem' }}>
-          <ExportPDF job={selectedJob} />
-        </div>
+          <div className="topbar-divider"></div>
 
-        {/* User Info */}
-        <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-avatar"><User size={16} /></div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{user?.name}</div>
-              <div className="sidebar-user-role" style={{ fontSize: '0.7rem' }}>
-                {ROLE_LABELS[user?.role] || user?.role}
-              </div>
+          {/* User Profile & Role Hub */}
+          <div className="topbar-user-badge">
+            <div className="user-avatar-circle">
+              <User size={15} />
             </div>
-            <button className="sidebar-logout" onClick={onLogout} title="เธญเธญเธเธเธฒเธเธฃเธฐเธเธ">
+            <div className="user-meta-text">
+              <span className="user-display-name">{user?.name || 'ผู้ใช้งาน'}</span>
+              <span className="user-display-role">{ROLE_LABELS[user?.role] || user?.role}</span>
+            </div>
+            <button className="btn-icon-logout" onClick={onLogout} title="ออกจากระบบ">
               <LogOut size={16} />
             </button>
           </div>
         </div>
-      </aside>
+      </header>
 
-      {/* โ”€โ”€ MAIN CONTENT โ”€โ”€ */}
-      <div className="main-content">
-        <header className="top-bar">
-          <div className="top-bar-title">
-            <currentPage.Icon size={20} className="page-icon" />
-            <h1>{currentPage.title}</h1>
-            {selectedJob && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>โ€” {selectedJob.title}</span>}
-          </div>
-          <div className="top-bar-actions">
-            <div className="status-chip">
-              <span className="dot"></span>
-              <span>เธเธนเนเธชเธกเธฑเธเธฃ {candidates.length} เธเธ</span>
+      <div className="enterprise-body-wrapper">
+        {/* ── 2. SIDEBAR NAVIGATION ── */}
+        <aside className="enterprise-sidebar">
+          {/* Active Job Selector Card */}
+          <div className="sidebar-job-picker-card">
+            <div className="job-picker-label">
+              <Layers size={13} />
+              <span>ตำแหน่งงานที่กำลังเปิดรับ</span>
             </div>
-            <button
-              className="auto-select-btn"
-              onClick={() => handleRunAnalysis(true)}
-              disabled={isAnalyzing || candidates.length === 0 || !jobReq.trim()}
-              title="เนเธซเน AI เธเนเธงเธขเน€เธฅเธทเธญเธเธเธนเนเธชเธกเธฑเธเธฃเธ—เธตเนเธ”เธตเธ—เธตเนเธชเธธเธ”เนเธซเนเธ—เธฑเธเธ—เธต"
-            >
-              <Zap size={14} />
-              {isAnalyzing ? 'เธเธณเธฅเธฑเธเธเธฃเธฐเธกเธงเธฅเธเธฅโ€ฆ' : 'เธเนเธเธซเธฒเธ•เธฑเธงเธ—เนเธญเธ'}
-            </button>
-          </div>
-        </header>
-
-        <main key={activeTab} className="page-content animate-fade-in">
-          {activeTab === 'requirements' && (
-            <JobRequirementsForm
-              jobReq={jobReq} setJobReq={setJobReq}
-              onAnalyze={handleRunAnalysis} isAnalyzing={isAnalyzing}
-              candidatesCount={candidates.length}
-              setCandidates={setCandidates} candidates={candidates}
+            <JobSelector 
+              selectedJob={selectedJob} 
+              setSelectedJob={setSelectedJob} 
+              user={user} 
+              refreshTrigger={jobRefresh} 
             />
-          )}
-          {activeTab === 'pipeline' && <PipelineBoard job={selectedJob} user={user} />}
-          {activeTab === 'interviews' && <InterviewScheduler job={selectedJob} user={user} />}
-          {activeTab === 'emails' && <EmailManager job={selectedJob} user={user} />}
-          {activeTab === 'offers' && <OfferManager job={selectedJob} user={user} />}
-          {activeTab === 'ranking' && <CandidateRanking results={analysisResults} originalCandidates={candidates} />}
-          {activeTab === 'comparison' && <ComparativeAnalysis results={analysisResults} onShortlist={handleShortlist} shortlist={shortlist} />}
-          {activeTab === 'shortlist' && <ShortlistView shortlist={shortlist} onRemove={handleRemoveFromShortlist} jobReq={jobReq} />}
-          {activeTab === 'activity' && <ActivityLog jobId={selectedJob?.id} />}
+          </div>
+
+          {/* Grouped Navigation Links */}
+          <nav className="sidebar-nav-groups">
+            {Object.entries(sections).map(([sectionKey, sectionTabs]) => (
+              <div key={sectionKey} className="nav-group">
+                <div className="nav-group-title">{sectionLabels[sectionKey]}</div>
+                <div className="nav-group-items">
+                  {sectionTabs.map(({ id, label, Icon, disabled, badge }) => (
+                    <button
+                      key={id}
+                      className={`nav-item ${activeTab === id ? 'active' : ''}`}
+                      onClick={() => !disabled && setActiveTab(id)}
+                      disabled={disabled}
+                    >
+                      <span className="nav-item-icon"><Icon size={17} /></span>
+                      <span className="nav-item-label">{label}</span>
+                      {badge > 0 && <span className="nav-item-badge">{badge}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </nav>
+
+          {/* Sidebar Footer / Export Report */}
+          <div className="sidebar-footer-box">
+            <div className="sidebar-export-wrap">
+              <ExportPDF job={selectedJob} />
+            </div>
+            <div className="system-status-indicator">
+              <span className="status-live-dot"></span>
+              <span>ระบบ AI พร้อมทำงาน (Typhoon v2.5)</span>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── 3. MAIN WORKSPACE ── */}
+        <main className="enterprise-main-area">
+          
+          {/* Executive KPI Summary Cards */}
+          <div className="executive-kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-icon-wrap bg-blue-light">
+                <User size={20} className="text-blue" />
+              </div>
+              <div className="kpi-data">
+                <div className="kpi-value">{candidates.length}</div>
+                <div className="kpi-label">ผู้สมัครในฐานข้อมูล</div>
+              </div>
+              <span className="kpi-sub">Total Pool</span>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-icon-wrap bg-purple-light">
+                <Briefcase size={20} className="text-purple" />
+              </div>
+              <div className="kpi-data">
+                <div className="kpi-value">{selectedJob ? selectedJob.title : 'ยังไม่เลือก'}</div>
+                <div className="kpi-label">ตำแหน่งงานปัจจุบัน</div>
+              </div>
+              <span className="kpi-sub">Active Position</span>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-icon-wrap bg-emerald-light">
+                <Sparkles size={20} className="text-emerald" />
+              </div>
+              <div className="kpi-data">
+                <div className="kpi-value">{topCandidateCount > 0 ? `${topCandidateCount} คน` : (analysisResults ? '0 คน' : '-')}</div>
+                <div className="kpi-label">ผ่านเกณฑ์ AI Score 80%+</div>
+              </div>
+              <span className="kpi-sub">Top Tier Candidates</span>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-icon-wrap bg-amber-light">
+                <ClipboardList size={20} className="text-amber" />
+              </div>
+              <div className="kpi-data">
+                <div className="kpi-value">{shortlist.length} คน</div>
+                <div className="kpi-label">Shortlisted</div>
+              </div>
+              <span className="kpi-sub">Ready for Interview</span>
+            </div>
+          </div>
+
+          {/* Dynamic Active Tab Workspace */}
+          <div key={activeTab} className="workspace-content animate-fade-in">
+            {activeTab === 'requirements' && (
+              <JobRequirementsForm
+                jobReq={jobReq} 
+                setJobReq={setJobReq}
+                onAnalyze={handleRunAnalysis} 
+                isAnalyzing={isAnalyzing}
+                candidatesCount={candidates.length}
+                setCandidates={setCandidates} 
+                candidates={candidates}
+                searchQuery={searchQuery}
+                onSelectCandidate={(c) => setInspectCandidate(c)}
+              />
+            )}
+            {activeTab === 'pipeline' && (
+              <PipelineBoard 
+                job={selectedJob} 
+                user={user} 
+                onSelectCandidate={(c) => setInspectCandidate(c)}
+              />
+            )}
+            {activeTab === 'interviews' && <InterviewScheduler job={selectedJob} user={user} />}
+            {activeTab === 'emails' && <EmailManager job={selectedJob} user={user} />}
+            {activeTab === 'offers' && <OfferManager job={selectedJob} user={user} />}
+            {activeTab === 'ranking' && (
+              <CandidateRanking 
+                results={analysisResults} 
+                originalCandidates={candidates} 
+                onSelectCandidate={(c) => setInspectCandidate(c)}
+                onShortlist={handleShortlist}
+                shortlist={shortlist}
+              />
+            )}
+            {activeTab === 'comparison' && (
+              <ComparativeAnalysis 
+                results={analysisResults} 
+                onShortlist={handleShortlist} 
+                shortlist={shortlist} 
+                onSelectCandidate={(c) => setInspectCandidate(c)}
+              />
+            )}
+            {activeTab === 'shortlist' && (
+              <ShortlistView 
+                shortlist={shortlist} 
+                onRemove={handleRemoveFromShortlist} 
+                jobReq={jobReq} 
+                onSelectCandidate={(c) => setInspectCandidate(c)}
+              />
+            )}
+            {activeTab === 'activity' && <ActivityLog jobId={selectedJob?.id} />}
+          </div>
+
         </main>
       </div>
+
+      {/* ── 4. CANDIDATE DETAIL SLIDE-OVER DRAWER ── */}
+      <CandidateDetailDrawer
+        candidate={inspectCandidate}
+        isOpen={Boolean(inspectCandidate)}
+        onClose={() => setInspectCandidate(null)}
+        onShortlist={handleShortlist}
+        isShortlisted={shortlist.some(s => s.id === inspectCandidate?.id)}
+        onNavigateToTab={(tabId) => setActiveTab(tabId)}
+      />
     </div>
   );
 };

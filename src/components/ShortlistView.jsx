@@ -1,21 +1,26 @@
-import React, { useState } from 'react';
-import { ClipboardList, Trash2, UserCheck, Download, CheckCircle, Scale, Gavel } from 'lucide-react';
+﻿import React, { useState } from 'react';
+import { 
+  ClipboardList, Trash2, Download, CheckCircle, Scale, Gavel, 
+  Eye, Sparkles, Clock, GraduationCap 
+} from 'lucide-react';
 import ComparativeAnalysis from './ComparativeAnalysis';
 import { judgeCandidates } from '../services/llmClient';
+import { useToast } from '../context/ToastContext';
 
-const ShortlistView = ({ shortlist, onRemove, jobReq }) => {
+const ShortlistView = ({ shortlist = [], onRemove, jobReq, onSelectCandidate }) => {
+  const toast = useToast();
   const [isComparing, setIsComparing] = useState(false);
   const [isJudging, setIsJudging] = useState(false);
   const [verdict, setVerdict] = useState(null);
 
   if (!shortlist || shortlist.length === 0) {
     return (
-      <div className="empty-state">
-        <div className="empty-state-icon">
-          <ClipboardList size={32} />
-        </div>
-        <h3>รายชื่อผู้เข้ารอบยังว่างเปล่า</h3>
-        <p>สร้างรายชื่อผู้เข้ารอบโดยการกดปุ่ม "เพิ่มลง Shortlist" ในหน้าเปรียบเทียบผู้สมัคร</p>
+      <div className="empty-state-box">
+        <ClipboardList size={40} className="text-muted mb-2" />
+        <h3 className="empty-title">รายชื่อผู้เข้ารอบ (Shortlist) ยังว่างเปล่า</h3>
+        <p className="empty-desc">
+          คุณสามารถเลือกผู้สมัครที่น่าสนใจเข้ามาอยู่ใน Shortlist ได้จากหน้า "ผลการจัดอันดับ AI" หรือ "เปรียบเทียบ Top 5"
+        </p>
       </div>
     );
   }
@@ -23,7 +28,7 @@ const ShortlistView = ({ shortlist, onRemove, jobReq }) => {
   const handleExport = () => {
     const header = "ชื่อ-นามสกุล,ตำแหน่งปัจจุบัน,ประสบการณ์(ปี),คะแนน,ทักษะที่มี,ทักษะที่ขาด\n";
     const rows = shortlist.map(c =>
-      `"${c.name}","${c.currentRole}",${c.yearsOfExperience},${c.score},"${(c.matchedSkills || []).join('; ')}","${(c.missingSkills || []).join('; ')}"`
+      `"${c.name}","${c.currentRole || ''}",${c.yearsOfExperience ?? c.experience ?? 0},${c.score || c.aiScore || 0},"${(c.matchedSkills || []).join('; ')}","${(c.missingSkills || []).join('; ')}"`
     ).join('\n');
     const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), header + rows], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -32,148 +37,193 @@ const ShortlistView = ({ shortlist, onRemove, jobReq }) => {
     a.download = `shortlisted_candidates_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success('ส่งออกข้อมูล Shortlist เป็นไฟล์ CSV เรียบร้อยแล้ว');
   };
 
   const handleJudge = async () => {
     if (!jobReq) {
-      alert("ไม่พบรายละเอียดความต้องการของตำแหน่งงาน โปรดกลับไปตรวจสอบหน้า 'รายละเอียดงาน' อีกครั้ง");
+      toast.warning("ไม่พบข้อกำหนดตำแหน่งงาน กรุณาระบุรายละเอียดงานในหน้า 'รายละเอียดและคุณสมบัติงาน' ก่อน");
       return;
     }
     
     setIsJudging(true);
     setVerdict(null);
+    toast.info("กำลังส่ง Shortlist ให้โมเดล AI Judge ทำการตัดสินและสรุปผล...");
     try {
       const result = await judgeCandidates(jobReq, shortlist);
       setVerdict(result.verdict);
+      toast.success("AI Judge ประเมินและสรุปผลการตัดสินเรียบร้อยแล้ว!");
     } catch (err) {
-      alert("เกิดข้อผิดพลาดในการประเมิน: " + err.message);
+      toast.error("เกิดข้อผิดพลาดในการประเมิน: " + err.message);
     } finally {
       setIsJudging(false);
     }
   };
 
   return (
-    <div className="animate-fade-in">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-        <div className="section-header" style={{ marginBottom: 0 }}>
-          <div className="section-header-icon green"><CheckCircle size={20} /></div>
-          <div className="section-header-text">
-            <h2 style={{ marginBottom: 0 }}>บุคคลที่ผ่านการคัดเลือก ({shortlist.length} คน)</h2>
-            <p style={{ margin: 0 }}>รายชื่อแคนดิเดตที่ดีที่สุดที่คุณเลือกไว้สำหรับการพิจารณารอบสุดท้าย</p>
+    <div className="enterprise-view-container animate-fade-in">
+      
+      {/* ── Top Header & Actions ── */}
+      <div className="enterprise-card mb-6">
+        <div className="card-header-with-action">
+          <div className="card-header-title">
+            <div className="scorecard-header-icon bg-emerald-light text-emerald">
+              <CheckCircle size={20} />
+            </div>
+            <div>
+              <h3 className="section-title">Executive Shortlisted Candidates ({shortlist.length} คน)</h3>
+              <p className="section-subtitle">
+                รายชื่อผู้สมัครที่ผ่านการคัดกรองเบื้องต้น พร้อมเครื่องมือ Export และ AI Executive Final Judge
+              </p>
+            </div>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {shortlist.length >= 2 && (
+
+          <div className="table-controls-bar">
             <button 
-              className={`btn btn-glow`} 
+              type="button" 
+              className="btn btn-secondary btn-sm"
+              onClick={handleExport}
+              title="ดาวน์โหลดเป็นไฟล์ CSV สำหรับนำไปใช้ใน Excel / Google Sheets"
+            >
+              <Download size={14} />
+              <span>Export CSV</span>
+            </button>
+
+            <button 
+              type="button" 
+              className={`btn btn-sm ${isComparing ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setIsComparing(!isComparing)}
+            >
+              <Scale size={14} />
+              <span>{isComparing ? 'ดูตารางรายการ' : 'เปรียบเทียบผู้เข้ารอบ'}</span>
+            </button>
+
+            <button 
+              type="button" 
+              className="btn btn-primary btn-sm"
               onClick={handleJudge}
               disabled={isJudging}
             >
-              <Gavel size={14} /> 
-              {isJudging ? 'AI กำลังตัดสิน...' : 'ให้ AI ช่วยฟันธงผู้ชนะ'}
+              <Gavel size={14} />
+              <span>{isJudging ? 'AI กำลังตัดสิน...' : 'AI Executive Verdict'}</span>
             </button>
-          )}
-
-          {shortlist.length >= 2 && (
-            <button 
-              className={`btn ${isComparing ? 'btn-primary' : 'btn-secondary'}`} 
-              onClick={() => setIsComparing(!isComparing)}
-            >
-              <Scale size={14} /> 
-              {isComparing ? 'ปิดตารางเปรียบเทียบ' : 'เปิดตารางเปรียบเทียบ'}
-            </button>
-          )}
-          <button className="btn btn-secondary" onClick={handleExport}>
-            <Download size={14} /> ดาวน์โหลด CSV
-          </button>
+          </div>
         </div>
       </div>
 
+      {/* ── AI Executive Verdict Panel ── */}
       {verdict && (
-        <div className="jury-verdict-card glass-panel animate-slide-up" style={{ marginBottom: '2rem', padding: '2rem', border: '1px solid var(--warning)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', color: 'var(--warning)' }}>
-            <Gavel size={24} />
-            <h2 style={{ margin: 0 }}>คำตัดสินของ AI ประจำฝ่ายบุคคล</h2>
+        <div className="enterprise-card mb-6 border-emerald-500 bg-emerald-light/20">
+          <div className="card-header-title mb-2">
+            <Sparkles size={18} className="text-emerald" />
+            <h4 className="font-semibold text-slate-900">คำตัดสินและข้อเสนอแนะสุดท้ายจาก AI (Executive Verdict)</h4>
           </div>
-          <p className="text-secondary text-sm mb-4">พิจารณาแบบเจาะลึกอิงจากความต้องการของตำแหน่งงานที่คุณสร้างไว้ ({jobReq.substring(0, 50)}...)</p>
-          <div className="verdict-content" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+          <div className="candidate-summary-box text-slate-800" style={{ whiteSpace: 'pre-line', background: 'white' }}>
             {verdict}
           </div>
         </div>
       )}
 
+      {/* ── View: Comparison or Table ── */}
       {isComparing ? (
-        <div style={{ marginTop: '2rem' }}>
-          <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--accent)' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-               <Scale size={18} /> เปรียบเทียบเฉพาะบุคลากรที่เข้ารอบ (Shortlist Comparison)
-            </h3>
-            <p className="text-secondary text-sm m-0 mt-1">
-              นี่คือตารางเปรียบเทียบจุดแข็ง/จุดอ่อน แบบละเอียด เพื่อให้คุณสามารถตัดสินใจเลือกคนเดียวที่ดีที่สุดจากคนที่ผ่านเข้ารอบมาได้ง่ายขึ้น
-            </p>
-          </div>
-          <ComparativeAnalysis 
-            candidatesToCompare={shortlist} 
-            shortlist={shortlist}
-            onShortlist={(c) => onRemove(c.id)}
-          />
-        </div>
+        <ComparativeAnalysis 
+          candidatesToCompare={shortlist} 
+          onSelectCandidate={onSelectCandidate}
+        />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="stagger-children">
-          {shortlist.map((candidate) => (
-            <div key={candidate.id} className="candidate-card animate-slide-up">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flex: 1, minWidth: 0 }}>
-                {/* Check Icon */}
-                <div className="candidate-rank" style={{
-                  background: 'var(--success-muted)',
-                  borderColor: 'rgba(16, 185, 129, 0.25)',
-                  color: 'var(--success)'
-                }}>
-                  <UserCheck size={20} />
-                </div>
-
-                {/* Info */}
-                <div className="candidate-info">
-                  <div className="candidate-name">{candidate.name}</div>
-                  <div className="candidate-meta">
-                    {candidate.currentRole} • ประสบการณ์ {candidate.yearsOfExperience} ปี
-                  </div>
-                  <div className="skill-tags">
-                    {(candidate.matchedSkills || []).slice(0, 5).map(skill => (
-                      <span key={skill} className="skill-tag matched">✓ {skill}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
-                {/* Score */}
-                <div className="candidate-score">
-                  <div className="candidate-score-label">คะแนนความเหมาะสม</div>
-                  <div style={{
-                    fontSize: '1.4rem',
-                    fontWeight: 800,
-                    color: 'var(--success)',
-                    fontFamily: "'JetBrains Mono', monospace"
-                  }}>
-                    {candidate.score}
-                  </div>
-                </div>
-                {/* Remove */}
-                <button
-                  className="btn btn-danger"
-                  onClick={() => onRemove(candidate.id)}
-                  title="คัดออก"
-                  style={{ padding: '0.5rem' }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="enterprise-card">
+          <div className="enterprise-table-container">
+            <table className="enterprise-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '50px' }}>#</th>
+                  <th>ผู้สมัคร (Candidate)</th>
+                  <th>ตำแหน่งปัจจุบัน</th>
+                  <th>ประสบการณ์</th>
+                  <th>AI Score</th>
+                  <th>ทักษะที่ตรงตามเกณฑ์</th>
+                  <th style={{ textAlign: 'right', width: '150px' }}>การดำเนินการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shortlist.map((candidate, idx) => {
+                  const score = candidate.score || candidate.aiScore || 0;
+                  return (
+                    <tr 
+                      key={candidate.id || idx}
+                      className="clickable-row"
+                      onClick={() => onSelectCandidate && onSelectCandidate(candidate)}
+                    >
+                      <td className="text-muted font-mono text-xs">{idx + 1}</td>
+                      <td>
+                        <div className="candidate-cell-profile">
+                          <div className="table-avatar">
+                            {candidate.name ? candidate.name.charAt(0).toUpperCase() : 'C'}
+                          </div>
+                          <div>
+                            <div className="candidate-name-text">{candidate.name}</div>
+                            <div className="candidate-id-text">{candidate.id || 'CAND'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="font-medium text-slate-800">
+                          {candidate.currentRole || candidate.role || '-'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="exp-badge">
+                          <Clock size={12} />
+                          <span>{candidate.yearsOfExperience ?? candidate.experience ?? 0} ปี</span>
+                        </span>
+                      </td>
+                      <td>
+                        <span className="score-badge-inline">
+                          {score} / 100
+                        </span>
+                      </td>
+                      <td>
+                        <div className="table-skills-wrap">
+                          {candidate.matchedSkills && candidate.matchedSkills.slice(0, 3).map((sk, sIdx) => (
+                            <span key={sIdx} className="table-skill-tag">{sk}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                          <button 
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onSelectCandidate) onSelectCandidate(candidate);
+                            }}
+                          >
+                            <Eye size={13} />
+                            <span>Dossier</span>
+                          </button>
+                          <button 
+                            type="button"
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemove(candidate.id);
+                            }}
+                            title="นำออกจาก Shortlist"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
     </div>
   );
 };

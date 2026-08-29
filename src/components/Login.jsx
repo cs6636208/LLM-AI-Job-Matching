@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight } from 'lucide-react';
+﻿import React, { useState } from 'react';
+import { Lock, Mail, ArrowRight, ShieldCheck, Sparkles, Building2, UserCheck, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../config.js';
+
+const DEMO_ACCOUNTS = [
+  { role: 'HR Manager', email: 'hr@example.com', password: 'HrPass123!', badge: 'แนะนำสำหรับทดสอบ' },
+  { role: 'Admin', email: 'admin@example.com', password: 'Admin123!', badge: 'สิทธิ์สูงสุด' },
+  { role: 'Interviewer', email: 'interviewer@example.com', password: 'Interview1!', badge: 'ผู้สัมภาษณ์' },
+];
 
 const Login = ({ onLogin, onSwitchToRegister }) => {
   const [email, setEmail] = useState('');
@@ -8,8 +14,7 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const performLogin = async (loginEmail, loginPass) => {
     setError('');
     setLoading(true);
 
@@ -17,8 +22,8 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include', // receive httpOnly refresh token cookie
+        body: JSON.stringify({ email: loginEmail, password: loginPass }),
+        credentials: 'include',
       });
 
       const data = await res.json();
@@ -37,60 +42,143 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
     }
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    performLogin(email, password);
+  };
+
+  const handleDemoLogin = (demo) => {
+    setEmail(demo.email);
+    setPassword(demo.password);
+    performLogin(demo.email, demo.password);
+  };
+
   return (
-    <div className="auth-card">
-      <div className="auth-brand">
-        <div className="auth-brand-icon">⚡</div>
-        <h2 className="text-gradient">ยินดีต้อนรับกลับมา</h2>
-        <p className="text-secondary">เข้าสู่ระบบสรรหาบุคลากรด้วย AI</p>
+    <div className="enterprise-auth-container">
+      {/* ── Left Hero / Enterprise Value Proposition ── */}
+      <div className="auth-hero-panel">
+        <div className="hero-brand">
+          <div className="hero-logo-box">
+            <Sparkles size={22} className="text-white" />
+          </div>
+          <span className="hero-brand-name">TALENT CLOUD AI</span>
+        </div>
+
+        <div className="hero-main-copy">
+          <span className="hero-tag">Enterprise Recruitment Platform</span>
+          <h1 className="hero-headline">
+            ระบบสรรหาและคัดกรองบุคลากรอัจฉริยะ ระดับองค์กร
+          </h1>
+          <p className="hero-subtext">
+            เพิ่มความแม่นยำในการคัดเลือกผู้สมัครด้วยโมเดล LLM ภาษาไทยชั้นนำ พร้อมระบบ Talent Pipeline, Interview Scheduler และ Offer Workflow แบบครบวงจร
+          </p>
+
+          <div className="hero-features-list">
+            <div className="hero-feature-item">
+              <CheckCircle2 size={18} className="text-emerald-400" />
+              <span>AI Multi-dimension Match Scoring & Skill Gap Analysis</span>
+            </div>
+            <div className="hero-feature-item">
+              <CheckCircle2 size={18} className="text-emerald-400" />
+              <span>End-to-End Recruitment Pipeline & Kanban Board</span>
+            </div>
+            <div className="hero-feature-item">
+              <CheckCircle2 size={18} className="text-emerald-400" />
+              <span>Role-Based Access Control (RBAC) & Enterprise Security</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="hero-footer-badge">
+          <Building2 size={16} />
+          <span>Enterprise Edition · Ver 2.4</span>
+        </div>
       </div>
 
-      {error && <div className="auth-error">{error}</div>}
+      {/* ── Right Form Panel ── */}
+      <div className="auth-form-panel">
+        <div className="auth-form-inner">
+          <div className="auth-header">
+            <h2 className="auth-title">ลงชื่อเข้าใช้งาน</h2>
+            <p className="auth-subtitle">เข้าสู่ระบบจัดการและบริหารทรัพยากรบุคคล</p>
+          </div>
 
-      <form onSubmit={handleSubmit} className="auth-form">
-        <div>
-          <label className="input-label mb-2 block">อีเมล</label>
-          <div className="auth-input-wrap">
-            <Mail size={16} className="auth-input-icon" />
-            <input
-              type="email"
-              required
-              className="input-field"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+          {error && <div className="enterprise-alert-error">{error}</div>}
+
+          <form onSubmit={handleSubmit} className="auth-form-inputs">
+            <div className="form-group">
+              <label className="form-label">อีเมลองค์กร (Corporate Email)</label>
+              <div className="input-with-icon">
+                <Mail size={16} className="input-icon" />
+                <input
+                  type="email"
+                  required
+                  className="form-control"
+                  placeholder="name@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">รหัสผ่าน (Password)</label>
+              <div className="input-with-icon">
+                <Lock size={16} className="input-icon" />
+                <input
+                  type="password"
+                  required
+                  className="form-control"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-block btn-lg"
+              disabled={loading}
+            >
+              {loading ? 'กำลังตรวจสอบสิทธิ์...' : (
+                <>
+                  <span>เข้าสู่ระบบ</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* 1-Click Demo Switcher */}
+          <div className="demo-accounts-box">
+            <div className="demo-header">
+              <UserCheck size={14} />
+              <span>เข้าสู่ระบบด่วนด้วยบัญชีทดสอบ (Demo Accounts)</span>
+            </div>
+            <div className="demo-buttons-grid">
+              {DEMO_ACCOUNTS.map((demo, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="btn-demo-item"
+                  onClick={() => handleDemoLogin(demo)}
+                  disabled={loading}
+                >
+                  <span className="demo-role">{demo.role}</span>
+                  <span className="demo-badge">{demo.badge}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="auth-switch-prompt">
+            ยังไม่มีบัญชีองค์กร?{' '}
+            <button type="button" className="btn-link" onClick={onSwitchToRegister}>
+              ลงทะเบียนใหม่
+            </button>
           </div>
         </div>
-
-        <div>
-          <label className="input-label mb-2 block">รหัสผ่าน</label>
-          <div className="auth-input-wrap">
-            <Lock size={16} className="auth-input-icon" />
-            <input
-              type="password"
-              required
-              className="input-field"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          className="btn btn-glow w-full mt-4"
-          style={{ justifyContent: 'center', padding: '0.7rem 1.25rem' }}
-          disabled={loading}
-        >
-          {loading ? 'กำลังตรวจสอบ...' : <><ArrowRight size={16} /> เข้าสู่ระบบ</>}
-        </button>
-      </form>
-
-      <div className="auth-footer">
-        ยังไม่มีบัญชีใช่ไหม?{' '}
-        <button onClick={onSwitchToRegister}>สร้างบัญชีใหม่</button>
       </div>
     </div>
   );

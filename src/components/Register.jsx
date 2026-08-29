@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { User, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { User, Lock, Mail, ShieldCheck, ArrowRight, Building2, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../config.js';
 
 const Register = ({ onSwitchToLogin, onLogin }) => {
@@ -11,10 +11,10 @@ const Register = ({ onSwitchToLogin, onLogin }) => {
   const [loading, setLoading] = useState(false);
 
   const passwordChecks = [
-    { label: 'เธญเธขเนเธฒเธเธเนเธญเธข 8 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ', test: (p) => p.length >= 8 },
-    { label: 'เธกเธตเธ•เธฑเธงเธเธดเธกเธเนเนเธซเธเน (A-Z)', test: (p) => /[A-Z]/.test(p) },
-    { label: 'เธกเธตเธ•เธฑเธงเธเธดเธกเธเนเน€เธฅเนเธ (a-z)', test: (p) => /[a-z]/.test(p) },
-    { label: 'เธกเธตเธ•เธฑเธงเน€เธฅเธ (0-9)', test: (p) => /[0-9]/.test(p) },
+    { label: 'ความยาว 8 ตัวอักษรขึ้นไป', test: (p) => p.length >= 8 },
+    { label: 'มีตัวพิมพ์ใหญ่ (A-Z)', test: (p) => /[A-Z]/.test(p) },
+    { label: 'มีตัวพิมพ์เล็ก (a-z)', test: (p) => /[a-z]/.test(p) },
+    { label: 'มีตัวเลข (0-9)', test: (p) => /[0-9]/.test(p) },
   ];
 
   const handleSubmit = async (e) => {
@@ -37,7 +37,7 @@ const Register = ({ onSwitchToLogin, onLogin }) => {
         if (data.details) {
           setValidationErrors(data.details);
         } else {
-          throw new Error(data.error || 'เธฅเธเธ—เธฐเน€เธเธตเธขเธเนเธกเนเธชเธณเน€เธฃเนเธ');
+          throw new Error(data.error || 'ลงทะเบียนไม่สำเร็จ');
         }
         return;
       }
@@ -46,113 +46,156 @@ const Register = ({ onSwitchToLogin, onLogin }) => {
       localStorage.setItem('user', JSON.stringify(data.user));
       onLogin(data.user);
     } catch (err) {
-      setError(err.message === 'User already exists' ? 'เธกเธตเธญเธตเน€เธกเธฅเธเธตเนเนเธเธฃเธฐเธเธเนเธฅเนเธง' : err.message);
+      setError(err.message === 'User already exists' ? 'มีอีเมลนี้ในระบบแล้ว' : err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-card">
-      <div className="auth-brand">
-        <div className="auth-brand-icon">
-          <ShieldCheck size={24} style={{ color: 'var(--cyan)' }} />
+    <div className="enterprise-auth-container">
+      {/* ── Left Hero Panel ── */}
+      <div className="auth-hero-panel">
+        <div className="hero-brand">
+          <div className="hero-logo-box">
+            <ShieldCheck size={22} className="text-white" />
+          </div>
+          <span className="hero-brand-name">TALENT CLOUD AI</span>
         </div>
-        <h2 className="text-gradient">เธชเธฃเนเธฒเธเธเธฑเธเธเธตเนเธซเธกเน</h2>
-        <p className="text-secondary">เน€เธเนเธฒเธฃเนเธงเธกเนเธเธฅเธ•เธเธญเธฃเนเธกเธชเธฃเธฃเธซเธฒเธ”เนเธงเธข AI</p>
+
+        <div className="hero-main-copy">
+          <span className="hero-tag">Join Enterprise Recruitment Hub</span>
+          <h1 className="hero-headline">
+            เริ่มต้นใช้งานระบบคัดกรองบุคลากรด้วย AI วันนี้
+          </h1>
+          <p className="hero-subtext">
+            สร้างบัญชีเพื่อเข้าถึงเครื่องมือคัดกรองผู้สมัครอัจฉริยะ พร้อมแดชบอร์ดบริหารกระบวนการสัมภาษณ์แบบครบวงจร
+          </p>
+
+          <div className="hero-features-list">
+            <div className="hero-feature-item">
+              <CheckCircle2 size={18} className="text-emerald-400" />
+              <span>ประเมินเรซูเม่และจัดอันดับด้วย LLM คุณภาพสูง</span>
+            </div>
+            <div className="hero-feature-item">
+              <CheckCircle2 size={18} className="text-emerald-400" />
+              <span>บริหารจัดการผู้สมัครในระบบ Kanban Pipeline</span>
+            </div>
+            <div className="hero-feature-item">
+              <CheckCircle2 size={18} className="text-emerald-400" />
+              <span>ระบบรักษาความปลอดภัยและการเข้ารหัสตามมาตรฐานองค์กร</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="hero-footer-badge">
+          <Building2 size={16} />
+          <span>Enterprise Edition · Ver 2.4</span>
+        </div>
       </div>
 
-      {error && <div className="auth-error">{error}</div>}
-
-      {validationErrors.length > 0 && (
-        <div className="auth-error">
-          <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
-            {validationErrors.map((err, i) => (
-              <li key={i}>{err.field}: {err.message}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="auth-form">
-        <div>
-          <label className="input-label mb-2 block">เธเธทเนเธญ - เธเธฒเธกเธชเธเธธเธฅ</label>
-          <div className="auth-input-wrap">
-            <User size={16} className="auth-input-icon" />
-            <input
-              type="text"
-              required
-              className="input-field"
-              placeholder="เธชเธกเธเธฒเธข เนเธเธ”เธต"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+      {/* ── Right Form Panel ── */}
+      <div className="auth-form-panel">
+        <div className="auth-form-inner">
+          <div className="auth-header">
+            <h2 className="auth-title">สร้างบัญชีผู้ใช้งานใหม่</h2>
+            <p className="auth-subtitle">กรอกข้อมูลเพื่อลงทะเบียนเข้าใช้งานในองค์กร</p>
           </div>
-        </div>
 
-        <div>
-          <label className="input-label mb-2 block">เธญเธตเน€เธกเธฅ</label>
-          <div className="auth-input-wrap">
-            <Mail size={16} className="auth-input-icon" />
-            <input
-              type="email"
-              required
-              className="input-field"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-        </div>
+          {error && <div className="enterprise-alert-error">{error}</div>}
 
-        <div>
-          <label className="input-label mb-2 block">เธฃเธซเธฑเธชเธเนเธฒเธ</label>
-          <div className="auth-input-wrap">
-            <Lock size={16} className="auth-input-icon" />
-            <input
-              type="password"
-              required
-              className="input-field"
-              placeholder="โ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ขโ€ข"
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {password.length > 0 && (
-            <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {passwordChecks.map((check, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontSize: '0.75rem',
-                    color: check.test(password) ? 'var(--success)' : 'var(--text-muted)',
-                  }}
-                >
-                  <span>{check.test(password) ? 'โ“' : 'โ—'}</span>
-                  <span>{check.label}</span>
-                </div>
-              ))}
+          {validationErrors.length > 0 && (
+            <div className="enterprise-alert-error">
+              <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+                {validationErrors.map((err, i) => (
+                  <li key={i}>{err.field}: {err.message}</li>
+                ))}
+              </ul>
             </div>
           )}
+
+          <form onSubmit={handleSubmit} className="auth-form-inputs">
+            <div className="form-group">
+              <label className="form-label">ชื่อ - นามสกุล (Full Name)</label>
+              <div className="input-with-icon">
+                <User size={16} className="input-icon" />
+                <input
+                  type="text"
+                  required
+                  className="form-control"
+                  placeholder="สมชาย ใจดี"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">อีเมลองค์กร (Email)</label>
+              <div className="input-with-icon">
+                <Mail size={16} className="input-icon" />
+                <input
+                  type="email"
+                  required
+                  className="form-control"
+                  placeholder="name@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">รหัสผ่าน (Password)</label>
+              <div className="input-with-icon">
+                <Lock size={16} className="input-icon" />
+                <input
+                  type="password"
+                  required
+                  className="form-control"
+                  placeholder="••••••••"
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+
+              {password.length > 0 && (
+                <div className="password-checklist mt-2">
+                  {passwordChecks.map((check, i) => (
+                    <div
+                      key={i}
+                      className={`password-check-item ${check.test(password) ? 'valid' : 'invalid'}`}
+                    >
+                      <span>{check.test(password) ? '✓' : '○'}</span>
+                      <span>{check.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-block btn-lg mt-3"
+              disabled={loading}
+            >
+              {loading ? 'กำลังสร้างบัญชี...' : (
+                <>
+                  <span>ยืนยันการสมัครสมาชิก</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="auth-switch-prompt">
+            มีบัญชีผู้ใช้อยู่แล้ว?{' '}
+            <button type="button" className="btn-link" onClick={onSwitchToLogin}>
+              ลงชื่อเข้าใช้งาน
+            </button>
+          </div>
         </div>
-
-        <button
-          type="submit"
-          className="btn btn-glow w-full mt-4"
-          style={{ justifyContent: 'center', padding: '0.7rem 1.25rem' }}
-          disabled={loading}
-        >
-          {loading ? 'เธเธณเธฅเธฑเธเธชเธฃเนเธฒเธเธเธฑเธเธเธต...' : 'เธชเธกเธฑเธเธฃเธชเธกเธฒเธเธดเธ'}
-        </button>
-      </form>
-
-      <div className="auth-footer">
-        เธกเธตเธเธฑเธเธเธตเธญเธขเธนเนเนเธฅเนเธง?{' '}
-        <button onClick={onSwitchToLogin}>เน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ</button>
       </div>
     </div>
   );
