@@ -16,7 +16,7 @@ const requireRole = (...roles) => (req, res, next) => {
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { jobId, status } = req.query;
-    const where = {};
+    const where = req.user.role === 'ADMIN' ? {} : { job: { userId: req.user.id } };
     if (jobId) where.jobId = Number(jobId);
     if (status) where.status = status;
 
@@ -50,6 +50,13 @@ router.post('/', requireAuth, requireRole('ADMIN', 'HR_MANAGER'), async (req, re
     if (!jobId || !candidateId || !interviewerId || !scheduledAt) {
       return res.status(400).json({ error: 'jobId, candidateId, interviewerId, and scheduledAt are required' });
     }
+
+    const [job, candidate] = await Promise.all([
+      prisma.job.findUnique({ where: { id: Number(jobId) }, select: { userId: true } }),
+      prisma.candidate.findUnique({ where: { id: candidateId }, select: { userId: true } }),
+    ]);
+    if (!job || !candidate) return res.status(404).json({ error: 'Job or candidate not found' });
+    if (req.user.role !== 'ADMIN' && (job.userId !== req.user.id || candidate.userId !== req.user.id)) return res.status(403).json({ error: 'Insufficient permissions' });
 
     const interview = await prisma.interview.create({
       data: {
@@ -86,6 +93,10 @@ router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { status, feedback, score, notes } = req.body;
 
+    const existing = await prisma.interview.findUnique({ where: { id: Number(req.params.id) }, include: { job: { select: { userId: true } } } });
+    if (!existing) return res.status(404).json({ error: 'Interview not found' });
+    const canEdit = req.user.role === 'ADMIN' || existing.job.userId === req.user.id || existing.interviewerId === req.user.id;
+    if (!canEdit) return res.status(403).json({ error: 'Insufficient permissions' });
     const interview = await prisma.interview.update({
       where: { id: Number(req.params.id) },
       data: {
@@ -111,6 +122,9 @@ router.put('/:id', requireAuth, async (req, res) => {
 // Delete interview
 router.delete('/:id', requireAuth, requireRole('ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
+    const existing = await prisma.interview.findUnique({ where: { id: Number(req.params.id) }, include: { job: { select: { userId: true } } } });
+    if (!existing) return res.status(404).json({ error: 'Interview not found' });
+    if (req.user.role !== 'ADMIN' && existing.job.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
     await prisma.interview.delete({ where: { id: Number(req.params.id) } });
     res.json({ message: 'Interview deleted' });
   } catch (err) {

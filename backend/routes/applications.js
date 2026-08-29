@@ -1,4 +1,7 @@
 import express from 'express';
+import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth.js';
 import { logActivity } from '../utils/activity.js';
@@ -6,6 +9,30 @@ import logger from '../logger.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const uploadRoot = path.resolve(process.env.UPLOAD_DIR || './uploads/resumes');
+const MAX_RESUME_BYTES = 5 * 1024 * 1024;
+const ALLOWED_RESUME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+const ALLOWED_RESUME_EXTENSIONS = new Set(['.pdf', '.doc', '.docx']);
+
+const saveResume = async ({ name, mimeType, data }) => {
+  if (!name || !data || !ALLOWED_RESUME_TYPES.has(mimeType)) {
+    throw new Error('A PDF, DOC, or DOCX resume is required');
+  }
+  const extension = path.extname(name).toLowerCase();
+  if (!ALLOWED_RESUME_EXTENSIONS.has(extension)) throw new Error('Resume file extension is not supported');
+  const buffer = Buffer.from(data, 'base64');
+  if (!buffer.length || buffer.length > MAX_RESUME_BYTES) {
+    throw new Error('Resume must be no larger than 5MB');
+  }
+  await fs.mkdir(uploadRoot, { recursive: true });
+  const storageKey = `${crypto.randomUUID()}${extension}`;
+  await fs.writeFile(path.join(uploadRoot, storageKey), buffer, { flag: 'wx' });
+  return storageKey;
+};
 
 const APPLICATION_STATUSES = ['NEW', 'REVIEWING', 'INTERVIEW', 'REJECTED', 'HIRED'];
 const STATUS_TO_STAGE = {
@@ -100,6 +127,8 @@ router.post('/jobs/:jobId/applications', async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const phone = String(req.body.phone || '').trim();
     const resumeName = req.body.resumeName ? String(req.body.resumeName).slice(0, 255) : null;
+    const resumeMimeType = req.body.resumeMimeType ? String(req.body.resumeMimeType) : null;
+    const resumeData = req.body.resumeData ? String(req.body.resumeData) : null;
     const coverNote = req.body.coverNote ? String(req.body.coverNote).slice(0, 5000) : null;
 
     if (!Number.isInteger(jobId) || !fullName || !email || !phone) {
@@ -107,11 +136,21 @@ router.post('/jobs/:jobId/applications', async (req, res) => {
     }
     if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ error: 'A valid email is required' });
     if (req.body.consentAccepted !== true) return res.status(400).json({ error: 'Candidate consent is required' });
+    if (!resumeName || !resumeData) return res.status(400).json({ error: 'A resume file is required' });
+    if (!/^[A-Za-z0-9+/=]+$/.test(resumeData)) return res.status(400).json({ error: 'Invalid resume file data' });
 
     const job = await prisma.job.findFirst({ where: { id: jobId, status: 'active' }, select: { id: true, title: true, userId: true } });
     if (!job) return res.status(404).json({ error: 'Job not found or no longer accepting applications' });
 
-    const application = await prisma.$transaction(async (tx) => {
+    let storageKey;
+    try {
+      storageKey = await saveResume({ name: resumeName, mimeType: resumeMimeType, data: resumeData });
+    } catch (fileError) {
+      return res.status(400).json({ error: fileError.message });
+    }
+
+    try {
+      const application = await prisma.$transaction(async (tx) => {
       let candidate = await tx.candidate.findFirst({ where: { userId: job.userId, email } });
 
       if (!candidate) {
@@ -139,17 +178,44 @@ router.post('/jobs/:jobId/applications', async (req, res) => {
 
       await tx.jobCandidate.createMany({ data: [{ jobId, candidateId: candidate.id, stage: 'APPLIED' }], skipDuplicates: true });
       return tx.application.create({
-        data: { jobId, candidateId: candidate.id, resumeName, coverNote, consentAccepted: true },
+        data: { jobId, candidateId: candidate.id, resumeName, resumeUrl: storageKey, coverNote, consentAccepted: true },
         select: { id: true, status: true, appliedAt: true, job: { select: { id: true, title: true } } },
       });
-    });
+      });
 
-    await logActivity(prisma, job.userId, 'public_application_received', 'application', String(application.id), { jobId, jobTitle: job.title });
-    res.status(201).json(application);
+      await logActivity(prisma, job.userId, 'public_application_received', 'application', String(application.id), { jobId, jobTitle: job.title });
+      res.status(201).json({ ...application, resumeAvailable: true });
+    } catch (err) {
+      await fs.unlink(path.join(uploadRoot, storageKey)).catch(() => {});
+      throw err;
+    }
   } catch (err) {
     if (err.code === 'DUPLICATE_APPLICATION') return res.status(409).json({ error: err.message });
     logger.error({ err }, 'Create public application error');
     res.status(500).json({ error: 'Error submitting application' });
+  }
+});
+
+router.get('/:id/resume', requireAuth, async (req, res) => {
+  try {
+    const application = await prisma.application.findUnique({
+      where: { id: Number(req.params.id) },
+      include: { job: { select: { userId: true } } },
+    });
+    if (!application) return res.status(404).json({ error: 'Application not found' });
+    if (req.user.role !== 'ADMIN' && application.job.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    if (!application.resumeUrl) return res.status(404).json({ error: 'Resume not found' });
+
+    const filePath = path.resolve(uploadRoot, application.resumeUrl);
+    if (!filePath.startsWith(`${uploadRoot}${path.sep}`)) return res.status(400).json({ error: 'Invalid resume path' });
+    await fs.access(filePath);
+    res.download(filePath, application.resumeName || 'resume');
+  } catch (err) {
+    if (err.code === 'ENOENT') return res.status(404).json({ error: 'Resume not found' });
+    logger.error({ err }, 'Download application resume error');
+    res.status(500).json({ error: 'Error downloading resume' });
   }
 });
 

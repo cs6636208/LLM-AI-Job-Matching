@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
@@ -9,7 +10,10 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET;
-const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh';
+if (!ACCESS_TOKEN_SECRET || ACCESS_TOKEN_SECRET.length < 32) {
+  throw new Error('JWT_SECRET must be configured with at least 32 characters');
+}
+const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || `${ACCESS_TOKEN_SECRET}_refresh`;
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -41,6 +45,18 @@ const setRefreshTokenCookie = (res, token) => {
   });
 };
 
+const hashRefreshToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const persistRefreshToken = async (userId, token) => {
+  await prisma.refreshToken.create({
+    data: {
+      userId,
+      token: hashRefreshToken(token),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+};
+
 /**
  * @swagger
  * /api/auth/register:
@@ -62,6 +78,7 @@ router.post('/register', validate(registerSchema), async (req, res) => {
     });
     logger.info({ userId: user.id, email }, 'User registered successfully');
     const { accessToken, refreshToken } = generateTokens({ id: user.id, email: user.email, name: user.name, role: user.role });
+    await persistRefreshToken(user.id, refreshToken);
     setRefreshTokenCookie(res, refreshToken);
     res.status(201).json({ token: accessToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   } catch (error) {
@@ -91,6 +108,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     logger.info({ userId: user.id, email }, 'User logged in');
     const payload = { id: user.id, email: user.email, name: user.name, role: user.role };
     const { accessToken, refreshToken } = generateTokens(payload);
+    await persistRefreshToken(user.id, refreshToken);
     setRefreshTokenCookie(res, refreshToken);
     res.json({ token: accessToken, user: payload });
   } catch (error) {
@@ -106,30 +124,49 @@ router.post('/login', validate(loginSchema), async (req, res) => {
  *     tags: [Auth]
  *     summary: Refresh access token
  */
-router.post('/refresh', (req, res) => {
+router.post('/refresh', async (req, res) => {
   const { refreshToken } = req.cookies;
   if (!refreshToken) return res.status(401).json({ error: 'No refresh token provided' });
   try {
     const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
-    prisma.user.findUnique({ where: { id: decoded.id } })
-      .then((user) => {
-        if (!user) return res.status(401).json({ error: 'User no longer exists' });
-        logger.debug({ userId: user.id }, 'Token refreshed');
-        const payload = { id: user.id, email: user.email, name: user.name, role: user.role };
-        const { accessToken, refreshToken: newRefreshToken } = generateTokens(payload);
-        setRefreshTokenCookie(res, newRefreshToken);
-        res.json({ token: accessToken, user: payload });
-      })
-      .catch((err) => {
-        logger.error({ err }, 'Refresh token DB error');
-        res.status(500).json({ error: 'Server error during token refresh' });
-      });
+    const storedToken = await prisma.refreshToken.findUnique({ where: { token: hashRefreshToken(refreshToken) } });
+    if (!storedToken || storedToken.expiresAt <= new Date() || storedToken.userId !== decoded.id) {
+      return res.status(403).json({ error: 'Invalid or expired refresh token' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+    if (!user) return res.status(401).json({ error: 'User no longer exists' });
+
+    const payload = { id: user.id, email: user.email, name: user.name, role: user.role };
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(payload);
+    await prisma.$transaction([
+      prisma.refreshToken.delete({ where: { id: storedToken.id } }),
+      prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          token: hashRefreshToken(newRefreshToken),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      }),
+    ]);
+    logger.debug({ userId: user.id }, 'Token refreshed');
+    setRefreshTokenCookie(res, newRefreshToken);
+    res.json({ token: accessToken, user: payload });
   } catch (err) {
+    logger.error({ err }, 'Refresh token error');
     return res.status(403).json({ error: 'Invalid or expired refresh token' });
   }
 });
 
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
+  const { refreshToken } = req.cookies;
+  try {
+    if (refreshToken) {
+      await prisma.refreshToken.deleteMany({ where: { token: hashRefreshToken(refreshToken) } });
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Could not revoke refresh token during logout');
+  }
   res.clearCookie('refreshToken', { path: '/api/auth' });
   res.json({ message: 'Logged out successfully' });
 });

@@ -82,14 +82,26 @@ router.post('/bulk', requireAuth, validate(bulkCandidateSchema), async (req, res
       yearsOfExperience: c.yearsOfExperience,
       education: c.education || '',
       summary: c.summary || '',
+      email: c.email || null,
+      phone: c.phone || null,
       skills: JSON.stringify(c.skills || []),
-      isMock: c.id?.includes('RAND') || false
+      isMock: c.id?.includes('RAND') || false,
     }));
 
-    await prisma.candidate.createMany({ data: dbData });
+    // createMany cannot return the generated cuid values in Prisma 5.
+    // Creating in a transaction lets the UI immediately use persisted IDs.
+    const created = await prisma.$transaction(
+      dbData.map((data) => prisma.candidate.create({ data }))
+    );
 
     logger.info({ userId: req.user.id, count: candidates.length }, 'Bulk candidates saved');
-    res.json({ message: 'Saved successfully' });
+    res.status(201).json({
+      message: 'Saved successfully',
+      candidates: created.map((candidate) => ({
+        ...candidate,
+        skills: JSON.parse(candidate.skills || '[]'),
+      })),
+    });
   } catch (err) {
     logger.error({ err, userId: req.user?.id }, 'Bulk save error');
     res.status(500).json({ error: 'Error saving candidates' });
@@ -137,6 +149,12 @@ router.post('/shortlist/:candidateId', requireAuth, async (req, res) => {
   try {
     const { candidateId } = req.params;
     const { score, matchedSkills, missingSkills } = req.body;
+
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } });
+    if (!candidate) return res.status(404).json({ error: 'Candidate not found' });
+    if (req.user.role !== 'ADMIN' && candidate.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
 
     const existing = await prisma.shortlist.findUnique({
       where: { userId_candidateId: { userId: req.user.id, candidateId } }

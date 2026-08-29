@@ -23,12 +23,15 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env}
       TYPHOON_API_KEY: ${TYPHOON_API_KEY:-}
+      UPLOAD_DIR: /app/uploads/resumes
       PORT: 5000
       ALLOWED_ORIGINS: http://localhost:8080
       NODE_ENV: production
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - resume_uploads:/app/uploads/resumes
     ports:
       - "5000:5000"
 
@@ -45,3 +48,4 @@ services:
 
 volumes:
   postgres_data:
+  resume_uploads:

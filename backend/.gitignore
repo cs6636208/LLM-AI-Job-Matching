@@ -10,3 +10,4 @@ dist
 # Database files (for SQLite, not needed for PostgreSQL)
 *.db
 *.db-journal
+uploads/

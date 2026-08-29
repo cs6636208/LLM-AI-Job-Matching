@@ -4,17 +4,7 @@ import { API_URL } from '../config.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 // โ”€โ”€ Token Refresh Logic โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
-let isRefreshing = false;
-let refreshSubscribers = [];
-
-const onTokenRefreshed = (newToken) => {
-  refreshSubscribers.forEach(cb => cb(newToken));
-  refreshSubscribers = [];
-};
-
-const subscribeTokenRefresh = (cb) => {
-  refreshSubscribers.push(cb);
-};
+let refreshPromise = null;
 
 /**
  * Core fetch wrapper: attaches the current access token, and if the
@@ -33,37 +23,32 @@ const authFetch = async (url, options = {}) => {
   // First attempt
   let res = await fetch(url, { ...options, headers, credentials: 'include' });
 
-  // If 403, try to refresh the access token
-  if (res.status === 403) {
-    if (!isRefreshing) {
-      isRefreshing = true;
-      try {
-        const refreshRes = await fetch(`${API_URL}/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include', // send httpOnly cookie
-        });
-
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          onTokenRefreshed(data.token);
-        } else {
-          // Refresh failed โ€” force logout
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.reload();
-          throw new Error('Session expired. Please log in again.');
-        }
-      } finally {
-        isRefreshing = false;
-      }
+  // If the access token expired, share one refresh request across concurrent calls.
+  if (res.status === 401 || res.status === 403) {
+    if (!refreshPromise) {
+      refreshPromise = fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      }).then(async (refreshRes) => {
+        if (!refreshRes.ok) throw new Error('Session expired. Please log in again.');
+        const data = await refreshRes.json();
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        return data.token;
+      }).finally(() => {
+        refreshPromise = null;
+      });
     }
 
-    // Wait for the ongoing refresh to complete, then retry
-    const newToken = await new Promise((resolve) => {
-      subscribeTokenRefresh(resolve);
-    });
+    let newToken;
+    try {
+      newToken = await refreshPromise;
+    } catch (error) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.reload();
+      throw error;
+    }
 
     const retryHeaders = {
       'Content-Type': 'application/json',

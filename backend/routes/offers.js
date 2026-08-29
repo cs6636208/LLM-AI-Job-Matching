@@ -19,7 +19,7 @@ const requireRole =
 router.get("/", requireAuth, async (req, res) => {
   try {
     const { jobId } = req.query;
-    const where = {};
+    const where = req.user.role === 'ADMIN' ? {} : { candidate: { userId: req.user.id } };
     if (jobId) where.jobId = Number(jobId);
 
     const offers = await prisma.offer.findMany({
@@ -52,6 +52,13 @@ router.post(
           .status(400)
           .json({ error: "candidateId and jobId are required" });
       }
+
+      const [job, candidate] = await Promise.all([
+        prisma.job.findUnique({ where: { id: Number(jobId) }, select: { userId: true } }),
+        prisma.candidate.findUnique({ where: { id: candidateId }, select: { userId: true } }),
+      ]);
+      if (!job || !candidate) return res.status(404).json({ error: "Job or candidate not found" });
+      if (req.user.role !== "ADMIN" && (job.userId !== req.user.id || candidate.userId !== req.user.id)) return res.status(403).json({ error: "Insufficient permissions" });
 
       const offer = await prisma.offer.create({
         data: {
@@ -96,6 +103,9 @@ router.put(
     try {
       const { status, salary, position, startDate, notes } = req.body;
 
+      const existing = await prisma.offer.findUnique({ where: { id: Number(req.params.id) }, include: { candidate: { select: { userId: true } } } });
+      if (!existing) return res.status(404).json({ error: "Offer not found" });
+      if (req.user.role !== "ADMIN" && existing.candidate.userId !== req.user.id) return res.status(403).json({ error: "Insufficient permissions" });
       const offer = await prisma.offer.update({
         where: { id: Number(req.params.id) },
         data: {
@@ -130,6 +140,8 @@ router.put(
 // Delete an offer
 router.delete("/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
+    const existing = await prisma.offer.findUnique({ where: { id: Number(req.params.id) } });
+    if (!existing) return res.status(404).json({ error: "Offer not found" });
     await prisma.offer.delete({ where: { id: Number(req.params.id) } });
     res.json({ message: "Offer deleted" });
   } catch (err) {

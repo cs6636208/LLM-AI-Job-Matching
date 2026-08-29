@@ -15,6 +15,9 @@ const requireRole = (...roles) => (req, res, next) => {
 // Get all rubrics for a job
 router.get('/:jobId', requireAuth, async (req, res) => {
   try {
+    const job = await prisma.job.findUnique({ where: { id: Number(req.params.jobId) }, select: { userId: true } });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (req.user.role !== 'ADMIN' && job.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
     const rubrics = await prisma.rubric.findMany({
       where: { jobId: Number(req.params.jobId) },
       orderBy: { weight: 'desc' },
@@ -31,6 +34,9 @@ router.post('/:jobId', requireAuth, requireRole('ADMIN', 'HR_MANAGER'), async (r
   try {
     const { name, weight, description } = req.body;
     if (!name) return res.status(400).json({ error: 'Rubric name is required' });
+    const job = await prisma.job.findUnique({ where: { id: Number(req.params.jobId) }, select: { userId: true } });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    if (req.user.role !== 'ADMIN' && job.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
 
     const rubric = await prisma.rubric.create({
       data: {
@@ -53,6 +59,9 @@ router.post('/:jobId', requireAuth, requireRole('ADMIN', 'HR_MANAGER'), async (r
 router.put('/:id', requireAuth, requireRole('ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
     const { name, weight, description } = req.body;
+    const existing = await prisma.rubric.findUnique({ where: { id: Number(req.params.id) }, include: { job: { select: { userId: true } } } });
+    if (!existing) return res.status(404).json({ error: 'Rubric not found' });
+    if (req.user.role !== 'ADMIN' && existing.job.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
     const rubric = await prisma.rubric.update({
       where: { id: Number(req.params.id) },
       data: {
@@ -71,6 +80,9 @@ router.put('/:id', requireAuth, requireRole('ADMIN', 'HR_MANAGER'), async (req, 
 // Delete a rubric
 router.delete('/:id', requireAuth, requireRole('ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
+    const existing = await prisma.rubric.findUnique({ where: { id: Number(req.params.id) }, include: { job: { select: { userId: true } } } });
+    if (!existing) return res.status(404).json({ error: 'Rubric not found' });
+    if (req.user.role !== 'ADMIN' && existing.job.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
     await prisma.rubric.delete({ where: { id: Number(req.params.id) } });
     res.json({ message: 'Rubric deleted' });
   } catch (err) {

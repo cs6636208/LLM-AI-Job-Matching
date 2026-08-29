@@ -23,6 +23,7 @@ router.post('/upload', requireAuth, async (req, res) => {
       unique.map(c =>
         prisma.candidate.create({
           data: {
+            userId: req.user.id,
             name: c.name,
             currentRole: c.currentRole || 'Unknown',
             yearsOfExperience: c.yearsOfExperience || 0,
@@ -37,7 +38,12 @@ router.post('/upload', requireAuth, async (req, res) => {
     );
     let addedToJob = 0;
     if (jobId) {
-      const job = await prisma.job.findUnique({ where: { id: Number(jobId) } });
+      const job = await prisma.job.findFirst({
+        where: {
+          id: Number(jobId),
+          ...(req.user.role === 'ADMIN' ? {} : { userId: req.user.id }),
+        },
+      });
       if (job) {
         await prisma.jobCandidate.createMany({
           data: created.map(c => ({ jobId: Number(jobId), candidateId: c.id, stage: 'APPLIED' })),

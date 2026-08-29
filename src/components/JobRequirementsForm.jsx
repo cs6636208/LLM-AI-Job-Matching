@@ -61,7 +61,7 @@ const JobRequirementsForm = ({
 
       const token = localStorage.getItem('token');
       if (token) {
-        await fetch(`${API_URL}/candidates/bulk`, {
+        const saveResponse = await fetch(`${API_URL}/candidates/bulk`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -70,9 +70,12 @@ const JobRequirementsForm = ({
           body: JSON.stringify({ candidates: [newCandidate] }),
           credentials: 'include',
         });
+        const saveData = await saveResponse.json().catch(() => ({}));
+        if (!saveResponse.ok) throw new Error(saveData.error || 'ไม่สามารถบันทึกผู้สมัครได้');
+        setCandidates(prev => [...(saveData.candidates || [newCandidate]), ...prev]);
+      } else {
+        setCandidates(prev => [newCandidate, ...prev]);
       }
-
-      setCandidates(prev => [newCandidate, ...prev]);
       toast.success(`ดึงข้อมูลและเพิ่มผู้สมัคร "${newCandidate.name}" เรียบร้อยแล้ว!`);
     } catch (err) {
       console.error(err);

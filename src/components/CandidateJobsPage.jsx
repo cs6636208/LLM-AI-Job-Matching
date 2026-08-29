@@ -47,6 +47,13 @@ const PUBLIC_JOBS = [
 
 const EMPTY_FORM = { fullName: '', email: '', phone: '', resume: null, consentAccepted: false };
 
+const fileToBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+  reader.onerror = () => reject(new Error('อ่านไฟล์เรซูเม่ไม่สำเร็จ'));
+  reader.readAsDataURL(file);
+});
+
 const normalizePublicJob = (job) => ({
   ...job,
   skills: job.skills?.length ? job.skills : (job.rubrics || []).map((rubric) => rubric.name).filter(Boolean),
@@ -98,7 +105,7 @@ const CandidateJobsPage = () => {
     event.preventDefault();
     setSubmitting(true);
     setSubmitError('');
-    fetch(`${API_URL}/public/jobs/${selectedJob.id}/applications`, {
+    fileToBase64(form.resume).then((resumeData) => fetch(`${API_URL}/public/jobs/${selectedJob.id}/applications`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -106,9 +113,11 @@ const CandidateJobsPage = () => {
         email: form.email,
         phone: form.phone,
         resumeName: form.resume?.name || null,
+        resumeMimeType: form.resume?.type || null,
+        resumeData,
         consentAccepted: form.consentAccepted === true,
       }),
-    })
+    }))
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || 'ส่งใบสมัครไม่สำเร็จ');

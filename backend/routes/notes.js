@@ -10,6 +10,9 @@ const prisma = new PrismaClient();
 // Get notes for a candidate (viewers see all, interviewers see non-private only)
 router.get('/:candidateId', requireAuth, async (req, res) => {
   try {
+    const candidate = await prisma.candidate.findUnique({ where: { id: req.params.candidateId }, select: { userId: true } });
+    if (!candidate) return res.status(404).json({ error: 'Candidate not found' });
+    if (req.user.role !== 'ADMIN' && candidate.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
     const where = { candidateId: req.params.candidateId };
 
     // Interviewers can't see private notes from others
@@ -40,6 +43,9 @@ router.post('/:candidateId', requireAuth, async (req, res) => {
     if (!content || content.trim() === '') {
       return res.status(400).json({ error: 'Note content is required' });
     }
+    const candidate = await prisma.candidate.findUnique({ where: { id: req.params.candidateId }, select: { userId: true } });
+    if (!candidate) return res.status(404).json({ error: 'Candidate not found' });
+    if (req.user.role !== 'ADMIN' && candidate.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
 
     const note = await prisma.note.create({
       data: {
@@ -71,6 +77,8 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (note.userId !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Can only edit your own notes' });
     }
+    const candidate = await prisma.candidate.findUnique({ where: { id: note.candidateId }, select: { userId: true } });
+    if (req.user.role !== 'ADMIN' && candidate?.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
 
     const updated = await prisma.note.update({
       where: { id: Number(req.params.id) },
@@ -95,6 +103,8 @@ router.delete('/:id', requireAuth, async (req, res) => {
     if (note.userId !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Can only delete your own notes' });
     }
+    const candidate = await prisma.candidate.findUnique({ where: { id: note.candidateId }, select: { userId: true } });
+    if (req.user.role !== 'ADMIN' && candidate?.userId !== req.user.id) return res.status(403).json({ error: 'Insufficient permissions' });
 
     await prisma.note.delete({ where: { id: Number(req.params.id) } });
     res.json({ message: 'Note deleted' });

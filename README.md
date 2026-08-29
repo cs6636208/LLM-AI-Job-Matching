@@ -14,7 +14,7 @@ An advanced, full-stack recruitment platform powered by **Typhoon AI**. This sys
 
 -   **Frontend:** React (Vite), Lucide-React for iconography, Vanilla CSS for premium styling.
 -   **Backend:** Node.js, Express.
--   **Database:** Prisma ORM with SQLite (Local).
+-   **Database:** Prisma ORM with PostgreSQL.
 -   **AI Engine:** Typhoon AI API (`typhoon-v2.5-30b-a3b-instruct`).
 
 ## Public candidate portal
@@ -27,7 +27,7 @@ The candidate-facing job board is available at `/jobs` and can be deployed behin
 - `GET /api/applications` (authenticated HR inbox)
 - `PUT /api/applications/:id` (authenticated HR status update)
 
-Resume files are currently stored as application metadata (`resumeName`). For production, connect the upload flow to S3/MinIO and store only a signed object URL in `resumeUrl`.
+Resume files are stored under `UPLOAD_DIR` with random storage keys and are downloadable only through the authenticated HR endpoint `GET /api/applications/:id/resume`. Docker mounts the `resume_uploads` volume so files survive container restarts. For a multi-instance production deployment, replace this local volume with S3/MinIO object storage and signed URLs.
 
 ## Docker
 
@@ -57,10 +57,11 @@ The public site and HR workspace are served at `http://localhost:8080`. The API 
     ```bash
     cd backend
     npm install
-    # Create a .env file and add:
-    # TYPHOON_API_KEY=sk-...
-    # JWT_SECRET=your_secret
+    # Create a .env file from backend/.env.example and set DATABASE_URL,
+    # JWT_SECRET (32+ chars), JWT_REFRESH_SECRET (32+ chars), and TYPHOON_API_KEY.
     npx prisma generate
+    npx prisma migrate deploy
+    npx prisma db seed
     npm run dev
     ```
 

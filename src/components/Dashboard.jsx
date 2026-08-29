@@ -44,40 +44,66 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchShortlist = async () => {
+    const fetchWorkspaceData = async () => {
       try {
         const token = localStorage.getItem('token');
         if (!token) return;
-        const res = await fetch(`${API_URL}/candidates/shortlists`, {
+        const requestOptions = {
           headers: { 'Authorization': `Bearer ${token}` },
           credentials: 'include',
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          setShortlist(data);
+        };
+        const [candidatesRes, shortlistRes] = await Promise.all([
+          fetch(`${API_URL}/candidates`, requestOptions),
+          fetch(`${API_URL}/candidates/shortlists`, requestOptions),
+        ]);
+        if (isMounted && candidatesRes.ok) {
+          setCandidates(await candidatesRes.json());
+        }
+        if (isMounted && shortlistRes.ok) {
+          setShortlist(await shortlistRes.json());
         }
       } catch (err) {
-        console.error('Error fetching shortlist:', err);
+        console.error('Error fetching workspace data:', err);
       }
     };
-    fetchShortlist();
+    fetchWorkspaceData();
     return () => { isMounted = false; };
-  }, []);
+  }, [setCandidates]);
 
   const handleShortlist = async (candidate) => {
-    const isAlreadyShortlisted = shortlist.find(c => c.id === candidate.id);
-    if (isAlreadyShortlisted) {
-      setShortlist(prev => prev.filter(c => c.id !== candidate.id));
-      toast.info(`นำ ${candidate.name} ออกจาก Shortlist แล้ว`);
-    } else {
-      setShortlist(prev => [candidate, ...prev]);
-      toast.success(`เพิ่ม ${candidate.name} เข้าสู่ Shortlist สำเร็จ!`);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/candidates/shortlist/${candidate.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          score: candidate.score || candidate.aiScore,
+          matchedSkills: candidate.matchedSkills || [],
+          missingSkills: candidate.missingSkills || [],
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'ไม่สามารถบันทึก Shortlist ได้');
+
+      if (data.isShortlisted) {
+        setShortlist(prev => [candidate, ...prev.filter(c => c.id !== candidate.id)]);
+        toast.success(`เพิ่ม ${candidate.name} เข้าสู่ Shortlist สำเร็จ!`);
+      } else {
+        setShortlist(prev => prev.filter(c => c.id !== candidate.id));
+        toast.info(`นำ ${candidate.name} ออกจาก Shortlist แล้ว`);
+      }
+    } catch (error) {
+      toast.error(error.message);
     }
   };
 
-  const handleRemoveFromShortlist = (candidateId) => {
-    setShortlist(prev => prev.filter(c => c.id !== candidateId));
-    toast.info('นำผู้สมัครออกจาก Shortlist แล้ว');
+  const handleRemoveFromShortlist = async (candidateId) => {
+    const candidate = shortlist.find(c => c.id === candidateId);
+    if (candidate) await handleShortlist(candidate);
   };
 
   const handleRunAnalysis = async (autoSelect = false) => {
@@ -101,6 +127,14 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
       toast.error('เกิดข้อผิดพลาดในการวิเคราะห์ข้อมูล: ' + error.message);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
+    } finally {
+      onLogout();
     }
   };
 
@@ -223,7 +257,7 @@ const Dashboard = ({ candidates, setCandidates, user, onLogout }) => {
               <span className="user-display-name">{user?.name || 'ผู้ใช้งาน'}</span>
               <span className="user-display-role">{ROLE_LABELS[user?.role] || user?.role}</span>
             </div>
-            <button className="btn-icon-logout" onClick={onLogout} title="ออกจากระบบ">
+            <button className="btn-icon-logout" onClick={handleLogout} title="ออกจากระบบ">
               <LogOut size={16} />
             </button>
           </div>

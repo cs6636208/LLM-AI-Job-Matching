@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
 import pinoHttp from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
 
@@ -25,8 +25,6 @@ import emailRoutes from './routes/emails.js';
 import exportRoutes from './routes/export.js';
 import bulkRoutes from './routes/bulk.js';
 import applicationRoutes from './routes/applications.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
